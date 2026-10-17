@@ -32,10 +32,31 @@ button{font-family:inherit}
   box-shadow:0 2px 6px rgba(15,23,42,.06),0 16px 48px rgba(15,23,42,.12)}
 #stage canvas{position:absolute;left:0;top:0;border-radius:6px}
 #hl{opacity:.45;mix-blend-mode:multiply;pointer-events:none} /* 형광펜 층: 반투명, 글씨가 비쳐 보임 */
+/* 위아래 넘김: 쪽들을 세로로 이어 붙이고, 지금 쓰는 쪽 위에만 필기 판(#stage)을 얹음 */
+#pages{display:flex;flex-direction:column;align-items:center;gap:24px;width:max-content;min-width:100%} /* 넓게 확대해도 왼쪽이 잘리지 않게 */
+.slot{position:relative;flex:none;background:#fff;border-radius:6px;touch-action:pan-x pan-y;
+  box-shadow:0 2px 6px rgba(15,23,42,.06),0 16px 48px rgba(15,23,42,.12)}
+.slot>canvas{position:absolute;left:0;top:0;border-radius:6px;pointer-events:none}
+.slot>canvas.shl{opacity:.45;mix-blend-mode:multiply}
+#wrap.vmode #stage{position:absolute;left:0;top:0;margin:0;background:transparent;box-shadow:none}
+#wrap.vmode #stage #bg{visibility:hidden} /* 바탕은 아래 쪽 그림이 보여 줌 */
 #ink{touch-action:none;cursor:crosshair}
 #ink.laser{cursor:none}
 #laser{pointer-events:none} /* 레이저 층: 저장·되돌리기와 상관없이 잠깐 보였다 사라짐 */
 #ink.texting{cursor:text}
+/* 펜 종류 고르기 */
+#penType{height:36px;display:flex;align-items:center;gap:4px;padding:0 10px;margin-right:2px;border:1px solid var(--line);border-radius:10px;
+  background:#fff;color:var(--ink);font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;flex:none}
+#penType:hover{background:rgba(15,23,42,.04)}
+#penType svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#penMenu{position:fixed;z-index:45;width:250px;padding:6px;display:flex;flex-direction:column;gap:2px;background:#fff;
+  border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+#penMenu button{display:flex;align-items:center;gap:12px;height:48px;padding:0 10px;border:none;border-radius:10px;background:transparent;
+  font:inherit;font-size:14px;color:var(--ink);cursor:pointer;text-align:left}
+#penMenu button:hover{background:rgba(15,23,42,.05)}
+#penMenu button.on{background:var(--accent-soft);color:var(--accent);font-weight:700}
+#penMenu svg{width:44px;height:20px;flex:none}
+#penMenu small{display:block;font-size:11px;font-weight:400;color:var(--muted)}
 /* 글상자 입력칸: 쓰는 동안만 보이고, 다 쓰면 캔버스에 글씨로 들어감 */
 #textEdit{position:absolute;z-index:5;margin:0;padding:0;border:none;white-space:pre;outline:none;
   background:rgba(255,255,255,.55);box-shadow:0 0 0 6px rgba(255,255,255,.55);border-radius:2px;
@@ -203,7 +224,7 @@ label.ib input{display:none}
 </head>
 <body>
 
-<div id="wrap"><div id="stage"><canvas id="bg"></canvas><canvas id="hl"></canvas><canvas id="ink"></canvas><canvas id="laser"></canvas><div id="links"></div><div id="textFrame" hidden></div><div id="textEdit" hidden contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="글상자 내용"></div><button id="textHandle" type="button" hidden title="끌어서 글상자 옮기기" aria-label="글상자 옮기기"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="m9 6 3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></button></div></div>
+<div id="wrap"><div id="pages" hidden></div><div id="stage"><canvas id="bg"></canvas><canvas id="hl"></canvas><canvas id="ink"></canvas><canvas id="laser"></canvas><div id="links"></div><div id="textFrame" hidden></div><div id="textEdit" hidden contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="글상자 내용"></div><button id="textHandle" type="button" hidden title="끌어서 글상자 옮기기" aria-label="글상자 옮기기"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="m9 6 3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></button></div></div>
 
 <!-- 상단: 확대·축소 + 페이지 -->
 <div id="top" class="float">
@@ -211,6 +232,7 @@ label.ib input{display:none}
   <span id="zoomLbl">100%</span>
   <button class="ib" id="zoomIn" title="확대 ( + )" aria-label="확대"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
   <button class="ib" id="zoomFit" title="화면 맞춤 ( 0 )" aria-label="화면 맞춤"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+  <button class="ib" id="modeBtn" title="넘김 방식 바꾸기" aria-label="넘김 방식 바꾸기"><svg viewBox="0 0 24 24"></svg></button>
   <div class="sep"></div>
   <button id="pg" type="button" title="눌러서 쪽 번호로 바로 가기 ( G )" aria-label="쪽 번호로 바로 가기">1 / 1</button>
   <span id="pgEdit" hidden><input id="pgInput" type="number" inputmode="numeric" min="1" aria-label="이동할 쪽 번호"><span>/ <span id="pgTotal">1</span></span></span>
@@ -239,9 +261,10 @@ label.ib input{display:none}
   </div>
   <div class="sep"></div>
   <div class="grp" id="penCtl">
+  <button id="penType" type="button" title="펜 종류 고르기" aria-haspopup="true"><span id="penTypeName">캘리그래피</span><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
   <div class="nibbox" title="펜촉 미리보기"><div id="nib"></div></div>
   <label class="ctl"><span>굵기</span><input id="size" type="range" min="2" max="30" value="10" aria-label="굵기"></label>
-  <label class="ctl"><span>펜촉각</span><input id="angle" type="range" min="0" max="180" value="45" aria-label="펜촉각"></label>
+  <label class="ctl" id="angleCtl"><span>펜촉각</span><input id="angle" type="range" min="0" max="180" value="45" aria-label="펜촉각"></label>
   </div>
   <div class="grp" id="textCtl" hidden>
   <label class="ctl"><span>글씨 크기</span><input id="fsize" type="number" min="8" max="300" value="32" inputmode="numeric" aria-label="글씨 크기"></label>
@@ -273,6 +296,13 @@ label.ib input{display:none}
   <button id="syncNow" type="button">지금 저장하기</button>
   <button id="logout" type="button">로그아웃</button>
   <div class="note">필기는 내 드라이브의 '판서 그림판' 폴더에 학습지별로 저장돼요. 필요 없으면 드라이브에서 직접 지우면 돼요.</div>
+</div>
+
+<!-- 펜 종류 -->
+<div id="penMenu" hidden role="menu" aria-label="펜 종류">
+  <button type="button" data-pt="cal" role="menuitem"><svg viewBox="0 0 44 20" aria-hidden="true"><path d="M3 15 C 12 2, 20 2, 22 10 S 32 18, 41 5" fill="none" stroke="currentColor" stroke-width="1" /><path d="M3 15 C 12 2, 20 2, 22 10 S 32 18, 41 5" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="6 3" opacity=".35"/></svg><span>캘리그래피 펜<small>획 방향에 따라 굵기가 바뀜</small></span></button>
+  <button type="button" data-pt="ball" role="menuitem"><svg viewBox="0 0 44 20" aria-hidden="true"><path d="M3 15 C 12 2, 20 2, 22 10 S 32 18, 41 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>볼펜<small>고른 굵기, 또박또박</small></span></button>
+  <button type="button" data-pt="brush" role="menuitem"><svg viewBox="0 0 44 20" aria-hidden="true"><path d="M3 15 C 12 2, 20 2, 22 10 S 32 18, 41 5" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/></svg><span>붓펜<small>세게 누를수록 굵어짐</small></span></button>
 </div>
 
 <!-- 반별 필기 -->
@@ -310,7 +340,8 @@ const GOOGLE_CLIENT_ID='909929859550-gsn5q7vaq7c1dq0nls3rk29tkj866apt.apps.googl
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const $=id=>document.getElementById(id);
 const bg=$('bg'),hl=$('hl'),ink=$('ink'),laser=$('laser'),stage=$('stage'),wrap=$('wrap');
-const bctx=bg.getContext('2d'),hctx=hl.getContext('2d'),ctx=ink.getContext('2d'),lctx=laser.getContext('2d');
+const bctx=bg.getContext('2d'),lctx=laser.getContext('2d');
+let hctx=hl.getContext('2d'),ctx=ink.getContext('2d'); // 다른 쪽 그림을 그릴 때 잠깐 바꿔 씀
 const MIN_ZOOM=0.5,MAX_ZOOM=4;
 const MARKER_SCALE=2.5; // 형광펜은 펜보다 굵게
 let pdf=null,page=0,pageCount=1,strokes=[[]],tool='pen',cur=null;
@@ -336,6 +367,11 @@ async function renderPage(){
   if(pdf){p=await pdf.getPage(page+1);if(myId!==renderId)return;v0=p.getViewport({scale:1});}
   W=baseW*zoom;
   H=pdf?v0.height*(W/v0.width):W*blankRatio;
+  let rebuilt=false;
+  if(vmode){
+    await ensureRatios();if(myId!==renderId)return;
+    rebuilt=layoutSlots();attachStage();
+  }
   // 캔버스가 너무 커지지 않게 해상도 제한 (태블릿 메모리 보호)
   const dpr=window.devicePixelRatio||1;
   const pr=Math.min(dpr,Math.sqrt(16e6/(W*H)));
@@ -355,6 +391,7 @@ async function renderPage(){
   $('pg').textContent=(page+1)+' / '+pageCount;
   $('zoomLbl').textContent=Math.round(zoom*100)+'%';
   redraw();
+  if(rebuilt)scrollToSlot(page);
 }
 function setSize(pr){
   stage.style.width=W+'px';stage.style.height=H+'px';
@@ -457,6 +494,12 @@ function linkAt(cx,cy){
 // 형광펜은 별도 층에 진하게 그리고, 층 전체를 반투명으로 보여줘서 겹쳐도 얼룩지지 않음
 function drawSeg(s,a,b){
   const c=s.marker?hctx:ctx;
+  if(s.pt==='ball'||s.pt==='brush'){ // 둥근 펜: 볼펜(고른 굵기) / 붓펜(필압에 따라 크게 변함)
+    const k=s.size*W/1000,f=p=>s.pt==='brush'?(0.12+p*1.5):(0.42+p*0.16);
+    c.strokeStyle=s.color;c.lineCap='round';c.lineJoin='round';c.lineWidth=k*(f(a.p)+f(b.p))/2;
+    c.beginPath();c.moveTo(a.x*W,a.y*W);c.lineTo(b.x*W,b.y*W);c.stroke();
+    return;
+  }
   const ang=s.angle*Math.PI/180,nx=Math.cos(ang),ny=Math.sin(ang);
   const pa=s.marker?1:(0.3+a.p*0.9),pb=s.marker?1:(0.3+b.p*0.9);
   const wa=s.size*W/1000*pa,wb=s.size*W/1000*pb;
@@ -498,7 +541,13 @@ function updateNib(){
     nib.style.transform='none';nib.style.background='#FF2D2D';nib.style.opacity=1;
     nib.style.boxShadow='0 0 8px rgba(255,30,30,.8)';return;
   }
-  nib.style.borderRadius='2px';nib.style.boxShadow='none';
+  nib.style.boxShadow='none';
+  if(tool==='pen'&&penType!=='cal'){ // 둥근 펜은 동그라미로
+    const d=Math.min(26,penType==='brush'?6+size*0.7:3+size*0.45);
+    nib.style.width=nib.style.height=d+'px';nib.style.borderRadius='50%';nib.style.transform='none';
+    nib.style.background=curColor();nib.style.opacity=1;return;
+  }
+  nib.style.borderRadius='2px';
   nib.style.height=Math.min(30,(8+size*0.75)*(marker?1.5:1))+'px';
   nib.style.width=(marker?6:4)+'px';
   nib.style.transform='rotate('+((+$('angle').value)-90)+'deg)';
@@ -526,13 +575,13 @@ let zs=null,zsTimer=null;
 function zoomPreview(newZoom,cx,cy){
   newZoom=clamp(newZoom,MIN_ZOOM,MAX_ZOOM);
   if(!zs){
-    const r=stage.getBoundingClientRect();
-    zs={ox:cx-r.left,oy:cy-r.top,cx,cy,startZoom:zoom,target:zoom,dx:0,dy:0};
-    stage.style.transformOrigin=zs.ox+'px '+zs.oy+'px';
+    const el=zoomEl(),r=el.getBoundingClientRect();
+    zs={el,ox:cx-r.left,oy:cy-r.top,cx,cy,startZoom:zoom,target:zoom,dx:0,dy:0};
+    el.style.transformOrigin=zs.ox+'px '+zs.oy+'px';
   }
   zs.target=newZoom;
   const s=newZoom/zs.startZoom;
-  stage.style.transform=`translate(${zs.dx}px,${zs.dy}px) scale(${s})`;
+  zs.el.style.transform=`translate(${zs.dx}px,${zs.dy}px) scale(${s})`;
   $('zoomLbl').textContent=Math.round(newZoom*100)+'%';
 }
 async function zoomCommit(){
@@ -541,13 +590,14 @@ async function zoomCommit(){
   zs=null;
   const fx=z.ox/oldW,fy=z.oy/oldW;
   const anchorX=z.cx+z.dx,anchorY=z.cy+z.dy;
-  stage.style.transform='';
+  z.el.style.transform='';
   zoom=z.target;
   await renderPage();
-  const r=stage.getBoundingClientRect();
+  const r=zoomEl().getBoundingClientRect();
   wrap.scrollLeft+=r.left+fx*W-anchorX;
   wrap.scrollTop+=r.top+fy*W-anchorY;
 }
+const zoomEl=()=>vmode?$('pages'):stage; // 위아래 방식에선 쪽 묶음 전체를 확대
 function zoomTo(newZoom){
   const r=wrap.getBoundingClientRect();
   zoomPreview(newZoom,r.left+r.width/2,r.top+r.height/2);
@@ -567,13 +617,18 @@ function toast(msg){const t=$('toast');t.textContent=msg;t.style.opacity=1;clear
 async function goPage(n){
   if(n<0||n>=pageCount){toast(n<0?'첫 페이지예요':'마지막 페이지예요');return;}
   commitText();
+  if(vmode){ // 위아래 방식: 그 쪽으로 스크롤
+    if(!slots[n])await renderPage();
+    scrollToSlot(n);activate(n);toast((n+1)+' / '+pageCount);return;
+  }
   page=n;laserStrokes=[];await renderPage();wrap.scrollTop=0;wrap.scrollLeft=0;toast((page+1)+' / '+pageCount);
   if(hasInk())markDirty(); // 반마다 보던 쪽도 기억
 }
 
 /* ---------- 입력: 펜·마우스=필기 / 손가락=넘기기·이동·확대 ---------- */
 const touches=new Map();let gesture=null;
-ink.addEventListener('pointerdown',e=>{
+ink.addEventListener('pointerdown',e=>inkDown(e));
+function inkDown(e){
   if(e.pointerType==='touch'){
     if(cur)return; // 펜으로 쓰는 중엔 손바닥 터치 무시
     ink.setPointerCapture(e.pointerId);
@@ -589,8 +644,9 @@ ink.addEventListener('pointerdown',e=>{
   if(tool==='eraser'||e.button===5){cur={erase:true,changed:eraseAt(pos(e))};return;} // 펜 뒤쪽 지우개도 인식
   const marker=tool==='marker',size=+$('size').value;
   cur={color:curColor(),size:marker?size*MARKER_SCALE:size,angle:+$('angle').value,marker,pts:[pos(e)]};
+  if(!marker&&penType!=='cal')cur.pt=penType; // 볼펜·붓펜
   strokes[page].push(cur);drawStroke(cur);
-});
+}
 ink.addEventListener('pointermove',e=>{
   if(e.pointerType==='touch'){
     if(!touches.has(e.pointerId))return;
@@ -662,7 +718,7 @@ function endGesture(){
       }else{const l=linkAt(gesture.lx,gesture.ly);if(l)openLink(l);}
     }
     // 가로로 넘칠 만큼 확대된 상태가 아니면, 옆으로 쓸어서 페이지 넘김
-    else if(!overflowX&&Math.abs(dx)>80&&Math.abs(dx)>Math.abs(dy)*1.5&&dt<800){
+    else if(!vmode&&!overflowX&&Math.abs(dx)>80&&Math.abs(dx)>Math.abs(dy)*1.5&&dt<800){
       goPage(page+(dx<0?1:-1));
     }
   }
@@ -677,12 +733,36 @@ function setTool(t){
   $('textBtn').classList.toggle('on',t==='text');
   ink.classList.toggle('texting',t==='text');
   $('penCtl').hidden=t==='text';$('textCtl').hidden=t!=='text';
+  $('penType').hidden=t!=='pen';$('penMenu').hidden=true;
+  $('angleCtl').hidden=t==='pen'&&penType!=='cal'; // 둥근 펜은 펜촉각이 필요 없음
   $('laserBtn').classList.toggle('on',t==='laser');
   ink.classList.toggle('laser',t==='laser');
   if(t!=='laser'){hoverPt=null;kickLaser();}
   syncSwatches();updateNib();
 }
-$('pen').onclick=()=>setTool('pen');
+$('pen').onclick=()=>{if(tool==='pen')openPenMenu();else setTool('pen');}; // 펜을 한 번 더 누르면 펜 종류 고르기
+/* 펜 종류: 캘리그래피(기본) / 볼펜 / 붓펜 */
+let penType='cal';
+const PEN_NAMES={cal:'캘리그래피',ball:'볼펜',brush:'붓펜'};
+function setPenType(t){
+  penType=PEN_NAMES[t]?t:'cal';
+  try{localStorage.setItem('pen:penType',penType);}catch(_){}
+  $('penTypeName').textContent=PEN_NAMES[penType];
+  document.querySelectorAll('#penMenu [data-pt]').forEach(b=>b.classList.toggle('on',b.dataset.pt===penType));
+  if(tool!=='pen')setTool('pen');else{$('angleCtl').hidden=penType!=='cal';updateNib();}
+}
+function openPenMenu(){
+  const m=$('penMenu');
+  if(!m.hidden){m.hidden=true;return;}
+  if(tool!=='pen')setTool('pen');
+  m.hidden=false;
+  const r=$('penType').getBoundingClientRect(),mh=m.offsetHeight;
+  m.style.left=Math.max(8,Math.min(innerWidth-258,r.left))+'px';
+  m.style.top=Math.max(8,r.top-mh-10)+'px';
+}
+$('penType').onclick=e=>{e.stopPropagation();openPenMenu();};
+document.querySelectorAll('#penMenu [data-pt]').forEach(b=>b.onclick=()=>{setPenType(b.dataset.pt);$('penMenu').hidden=true;});
+document.addEventListener('click',e=>{if(!e.target.closest('#penMenu,#penType,#pen'))$('penMenu').hidden=true;});
 $('laserBtn').onclick=()=>setTool('laser');
 $('textBtn').onclick=()=>setTool('text');
 $('marker').onclick=()=>setTool('marker');
@@ -722,7 +802,7 @@ async function openPdfBuffer(buf,name,size){
   pageCount=pdf.numPages;page=0;zoom=1;strokes=Array.from({length:pageCount},()=>[]);
   baseKey=key;noteLabel=lastLabelOf(key);
   await openDoc(noteKeyOf(baseKey,noteLabel),name);
-  await renderPage();wrap.scrollTop=0;
+  await renderPage();if(!vmode)wrap.scrollTop=0;
   toast(noteLabel?name+' · '+noteLabel:name);
   archivePdf(); // 로그인돼 있으면 PDF도 드라이브에 보관
   return true;
@@ -732,7 +812,7 @@ async function openBlank(){
   pdf=null;curPdfBytes=null;pageCount=1;page=0;zoom=1;strokes=[[]];
   baseKey='blank';noteLabel=lastLabelOf('blank');
   await openDoc(noteKeyOf(baseKey,noteLabel),'빈 노트');
-  await renderPage();wrap.scrollTop=0;
+  await renderPage();if(!vmode)wrap.scrollTop=0;
   toast(noteLabel?'빈 노트 · '+noteLabel:'빈 노트');
 }
 $('save').onclick=()=>{
@@ -799,13 +879,13 @@ function serialize(){
   return {v:1,app:'pen',key:docKey,base:baseKey,label:noteLabel,name:docName,pageCount,pg:page,updated:docUpdated,
     pages:strokes.map(pg=>pg.map(s=>s.type==='text'
       ?{t:'x',x:r4(s.x),y:r4(s.y),r:s.runs.map(r=>r.c?[r.t,r.b?1:0,r.c]:[r.t,r.b?1:0]),fs:s.fs,c:s.color}
-      :{c:s.color,s:r2(s.size),a:s.angle,m:s.marker?1:0,p:s.pts.map(q=>[r4(q.x),r4(q.y),r2(q.p)])}))};
+      :{c:s.color,s:r2(s.size),a:s.angle,m:s.marker?1:0,k:s.pt||undefined,p:s.pts.map(q=>[r4(q.x),r4(q.y),r2(q.p)])}))};
 }
 function applyData(d){
   const pages=(d.pages||[]).map(pg=>pg.map(s=>s.t==='x'
     ?{type:'text',x:s.x,y:s.y,fs:s.fs||32,color:s.c,
       runs:s.r?s.r.map(r=>({t:r[0],b:!!r[1],c:r[2]||null})):[{t:s.tx||'',b:!!s.b,c:null}]} // 예전 형식(전체 굵기)도 읽음
-    :{color:s.c,size:s.s,angle:s.a,marker:!!s.m,pts:s.p.map(q=>({x:q[0],y:q[1],p:q[2]}))}));
+    :{color:s.c,size:s.s,angle:s.a,marker:!!s.m,pt:s.k||null,pts:s.p.map(q=>({x:q[0],y:q[1],p:q[2]}))}));
   if(pdf){ // PDF 쪽수에 맞춤
     strokes=Array.from({length:pageCount},(_,i)=>pages[i]||[]);
   }else{
@@ -854,7 +934,8 @@ function markDirty(){
 }
 function saveLocalNow(){
   if(!docKey)return;
-  if(!lsSet(LS_DOC+docKey,JSON.stringify(serialize()))&&!lsWarned){
+  // 이 기기 사본은 '아직 드라이브에 못 올린 필기'를 잠깐 맡아 두는 용도(pending). 드라이브에 저장되면 바로 지움
+  if(!lsSet(LS_DOC+docKey,JSON.stringify({...serialize(),pending:1}))&&!lsWarned){
     lsWarned=true;toast('이 기기 저장 공간이 꽉 찼어요. 로그인해서 드라이브에 저장해 주세요');
   }
 }
@@ -862,18 +943,18 @@ function flushSave(){
   clearTimeout(saveTimer);
   saveChain=saveChain.then(async()=>{
     if(!docKey)return;
-    saveLocalNow();
-    if(!driveDirty){if(!accessToken)setSync(offlineState());return;}
+    if(!driveDirty){setSync(accessToken?'saved':offlineState());return;} // 바뀐 게 없으면 아무것도 안 씀
+    saveLocalNow(); // 드라이브에 올라가기 전까지만 이 기기에 맡겨 둠
     if(!accessToken){setSync(offlineState());return;}
     setSync('saving');
-    try{await driveSave(serialize());driveDirty=false;setSync('saved');}
+    try{await driveSave(serialize());driveDirty=false;lsDel(LS_DOC+docKey);setSync('saved');} // 드라이브에 저장됐으면 이 기기 사본은 지움
     catch(_){if(accessToken)setSync('error');}
   });
   return saveChain;
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden)flushSave();});
 window.addEventListener('beforeunload',e=>{
-  clearTimeout(saveTimer);saveLocalNow(); // 이 기기에는 바로 저장
+  clearTimeout(saveTimer);if(driveDirty)saveLocalNow(); // 아직 못 올린 필기만 이 기기에 맡겨 둠
   if(driveDirty&&accessToken){e.preventDefault();e.returnValue='';} // 드라이브 저장이 덜 끝났으면 한 번 물어봄
 });
 
@@ -881,13 +962,17 @@ window.addEventListener('beforeunload',e=>{
 async function openDoc(key,name){
   docKey=key;docName=name;docUpdated=0;driveDirty=false;
   $('noteName').textContent=noteLabel||'기본';
-  const local=readLocal(key);
-  let remote=null;
-  if(accessToken){setSync('loading');try{remote=await driveLoad(key);}catch(_){}}
+  let local=readLocal(key);
+  let remote=null,remoteOk=false;
+  if(accessToken){setSync('loading');try{remote=await driveLoad(key);remoteOk=true;}catch(_){}}
+  if(remoteOk&&local){
+    // 드라이브가 기준: 이미 올라간 예전 사본이나 드라이브보다 오래된 사본은 지움 (드라이브에서 지운 필기가 되살아나지 않게)
+    if(!local.pending||(remote&&(remote.updated||0)>=(local.updated||0))){lsDel(LS_DOC+key);local=null;}
+  }
   const best=[local,remote].filter(Boolean).sort((a,b)=>(b.updated||0)-(a.updated||0))[0];
   if(best&&best.pages&&best.pages.some(pg=>pg.length)){applyData(best);toast('저장해 둔 필기를 불러왔어요');}
-  // 이 기기 쪽이 더 최근이면 드라이브에 올려 둠
-  if(local&&(!remote||(local.updated||0)>(remote.updated||0))&&local.pages&&local.pages.some(pg=>pg.length))driveDirty=true;
+  // 아직 못 올린 이 기기 필기가 남아 있으면 드라이브에 올림
+  if(local&&local.pending&&(!remote||(local.updated||0)>(remote.updated||0))&&local.pages&&local.pages.some(pg=>pg.length))driveDirty=true;
   if(accessToken){driveDirty?flushSave():setSync('saved');}
   else setSync(offlineState());
 }
@@ -934,7 +1019,7 @@ async function afterLogin(){
   const remoteHas=remote&&remote.pages&&remote.pages.some(pg=>pg.length);
   if(remoteHas&&(remote.updated||0)>docUpdated){
     if(!hasInk()||confirm('드라이브에 더 최근에 저장된 필기가 있어요. 불러올까요?\n(지금 화면의 필기는 바뀌어요)')){
-      applyData(remote);saveLocalNow();driveDirty=false;await renderPage();setSync('saved');
+      applyData(remote);lsDel(LS_DOC+docKey);driveDirty=false;await renderPage();setSync('saved');
       toast('드라이브의 필기를 불러왔어요');return;
     }
   }
@@ -1041,6 +1126,139 @@ async function driveSave(data,retry){
     headers:{'Content-Type':'multipart/related; boundary='+bd},body:mp})).json();
   driveIds[data.key]=r.id;
 }
+
+/* ---------- 넘김 방식: 위아래(이어 보기) / 옆으로(한 쪽씩) ---------- */
+// 위아래 방식: 쪽마다 바탕 그림(PDF)과 필기 그림을 따로 그려 세로로 이어 붙이고,
+// 지금 쓰는 쪽 위에만 필기 판(#stage)을 얹음. 스크롤하거나 다른 쪽을 펜으로 누르면 그 쪽으로 판이 옮겨감
+let vmode=(lsGet('pen:mode')||'v')==='v';
+const pagesEl=$('pages');
+let slots=[],slotsSig='',pageRatios=[],ratiosFor=null,io=null,scrollTimer=null,noPickUntil=0;
+const visSlots=new Set();
+async function ensureRatios(){ // 쪽마다 세로/가로 비율
+  if(!pdf){pageRatios=[];ratiosFor=null;return;}
+  if(ratiosFor===pdf&&pageRatios.length===pdf.numPages)return;
+  const doc=pdf,arr=[];
+  for(let i=0;i<doc.numPages;i++){const pp=await doc.getPage(i+1),v=pp.getViewport({scale:1});arr.push(v.height/v.width);}
+  if(doc===pdf){pageRatios=arr;ratiosFor=doc;}
+}
+const ratioOf=i=>pdf?(pageRatios[i]||1.414):blankRatio;
+const slotPr=h=>Math.min(window.devicePixelRatio||1,Math.sqrt(8e6/(W*h)));
+function layoutSlots(){
+  const sig=docKey+'|'+pageCount+'|'+Math.round(W)+'|'+(pdf?'p':'b');
+  if(sig===slotsSig&&slots.length===pageCount)return false;
+  slotsSig=sig;
+  stage.remove();
+  if(io)io.disconnect();
+  pagesEl.textContent='';slots=[];visSlots.clear();
+  io=new IntersectionObserver(ents=>{
+    for(const en of ents){
+      const i=+en.target.dataset.i;
+      if(en.isIntersecting){visSlots.add(i);paintSlotBg(i);paintSlotInk(i);}
+      else{visSlots.delete(i);freeSlot(i);} // 멀리 있는 쪽은 그림을 비워 메모리 아낌
+    }
+  },{root:wrap,rootMargin:'150% 0px'});
+  for(let i=0;i<pageCount;i++){
+    const el=document.createElement('div');el.className='slot';el.dataset.i=i;
+    el.style.width=W+'px';el.style.height=W*ratioOf(i)+'px';
+    const b=document.createElement('canvas'),h=document.createElement('canvas'),k=document.createElement('canvas');
+    b.className='sbg';h.className='shl';k.className='sink';
+    el.append(b,h,k);pagesEl.appendChild(el);
+    el.addEventListener('pointerdown',e=>slotDown(e,i));
+    slots.push({el,bg:b,hl:h,ink:k,bgFor:null});
+    io.observe(el);
+  }
+  return true;
+}
+function attachStage(){
+  const sl=slots[page];if(!sl)return;
+  if(stage.parentNode!==sl.el)sl.el.appendChild(stage);
+  sl.ink.hidden=true;sl.hl.hidden=true; // 이 쪽 필기는 판이 직접 그림
+}
+function freeSlot(i){
+  const sl=slots[i];if(!sl)return;
+  for(const c of [sl.bg,sl.hl,sl.ink]){c.width=0;c.height=0;}
+  sl.bgFor=null;
+}
+async function paintSlotBg(i){
+  const sl=slots[i],sig=slotsSig;if(!sl||sl.bgFor===sig)return;
+  sl.bgFor=sig;
+  const h=W*ratioOf(i),pr=slotPr(h),c=sl.bg;
+  c.width=Math.round(W*pr);c.height=Math.round(h*pr);c.style.width=W+'px';c.style.height=h+'px';
+  const g=c.getContext('2d');
+  if(!pdf){g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);return;}
+  try{
+    const pp=await pdf.getPage(i+1);if(slotsSig!==sig)return;
+    const v0=pp.getViewport({scale:1});
+    await pp.render({canvasContext:g,viewport:pp.getViewport({scale:(W/v0.width)*pr})}).promise;
+  }catch(_){if(slots[i]===sl)sl.bgFor=null;}
+}
+function paintSlotInk(i){ // 판이 없는 쪽의 필기를 그림으로 보여 줌
+  const sl=slots[i];if(!sl)return;
+  if(i===page){sl.ink.hidden=true;sl.hl.hidden=true;return;}
+  if(!visSlots.has(i))return;
+  const h=W*ratioOf(i),pr=slotPr(h);
+  for(const c of [sl.ink,sl.hl]){c.hidden=false;c.width=Math.round(W*pr);c.height=Math.round(h*pr);c.style.width=W+'px';c.style.height=h+'px';}
+  const oc=ctx,oh=hctx;
+  ctx=sl.ink.getContext('2d');hctx=sl.hl.getContext('2d');
+  ctx.setTransform(pr,0,0,pr,0,0);hctx.setTransform(pr,0,0,pr,0,0);
+  try{for(const st of strokes[i]||[])drawStroke(st);}finally{ctx=oc;hctx=oh;}
+}
+function activate(n){ // 필기 판을 n쪽으로 옮김
+  if(!vmode||n===page||!slots[n])return;
+  commitText();
+  const old=page;page=n;laserStrokes=[];hoverPt=null;
+  paintSlotInk(old);
+  H=W*ratioOf(n);setSize(Math.min(window.devicePixelRatio||1,Math.sqrt(16e6/(W*H))));
+  attachStage();redraw();
+  $('pg').textContent=(page+1)+' / '+pageCount;
+  renderPage(); // 판의 바탕·링크는 뒤이어 채움
+  if(hasInk())markDirty(); // 반마다 보던 쪽 기억
+}
+function slotDown(e,i){ // 판이 없는 쪽을 펜으로 누르면 그 쪽으로 판을 옮기고 바로 이어서 씀
+  if(e.pointerType==='touch'||i===page||e.target.closest('#stage'))return;
+  e.preventDefault();
+  activate(i);inkDown(e);
+}
+function scrollToSlot(n){
+  const sl=slots[n];if(!sl)return;
+  noPickUntil=Date.now()+400;
+  const pad=parseFloat(getComputedStyle(wrap).paddingTop)||0;
+  wrap.scrollTop+=sl.el.getBoundingClientRect().top-wrap.getBoundingClientRect().top-pad;
+}
+function pickByScroll(){ // 화면 가운데쯤에 걸친 쪽으로 판을 옮김
+  if(!vmode||cur||editing||zs||touches.size||gesture||Date.now()<noPickUntil)return;
+  const r=wrap.getBoundingClientRect(),cy=r.top+r.height*0.4;
+  for(let i=0;i<slots.length;i++){
+    const b=slots[i].el.getBoundingClientRect();
+    if(b.top<=cy&&b.bottom>=cy){if(i!==page)activate(i);return;}
+  }
+}
+wrap.addEventListener('scroll',()=>{
+  if(!vmode)return;
+  clearTimeout(scrollTimer);scrollTimer=setTimeout(pickByScroll,150);
+},{passive:true});
+const MODE_ICON={
+  v:'<path d="M12 3v18"/><path d="m8 7 4-4 4 4M8 17l4 4 4-4"/>',
+  h:'<path d="M3 12h18"/><path d="m7 8-4 4 4 4M17 8l4 4-4 4"/>'
+};
+function updateModeBtn(){
+  const b=$('modeBtn');b.querySelector('svg').innerHTML=MODE_ICON[vmode?'v':'h'];
+  const t=vmode?'지금: 위아래로 넘기기 (누르면 옆으로 넘기기)':'지금: 옆으로 넘기기 (누르면 위아래로 넘기기)';
+  b.title=t;b.setAttribute('aria-label',t);
+}
+async function setMode(v){
+  commitText();
+  vmode=v;lsSet('pen:mode',v?'v':'h');
+  wrap.classList.toggle('vmode',v);pagesEl.hidden=!v;
+  if(!v){if(io)io.disconnect();wrap.appendChild(stage);pagesEl.textContent='';slots=[];slotsSig='';visSlots.clear();}
+  else slotsSig=''; // 새로 깔기
+  updateModeBtn();
+  await renderPage();
+  if(!v){wrap.scrollTop=0;wrap.scrollLeft=0;}
+  toast(v?'위아래로 넘기기':'옆으로 넘기기');
+}
+$('modeBtn').onclick=()=>setMode(!vmode);
+wrap.classList.toggle('vmode',vmode);pagesEl.hidden=!vmode;updateModeBtn();
 
 /* ---------- 쪽 번호로 바로 가기 ---------- */
 // 위쪽 '3 / 12'를 누르면 숫자 칸으로 바뀜 → 번호 입력 후 Enter
@@ -1332,7 +1550,7 @@ async function switchLabel(lb){
   strokes=pdf?Array.from({length:pageCount},()=>[]):[[]];if(!pdf)pageCount=1;
   page=0;laserStrokes=[];
   await openDoc(noteKeyOf(baseKey,lb),docName);
-  await renderPage();wrap.scrollTop=0;
+  await renderPage();if(!vmode)wrap.scrollTop=0;
   toast((lb||'기본')+' 필기');
 }
 $('noteBtn').onclick=e=>{e.stopPropagation();openNotePop();};
@@ -1465,6 +1683,7 @@ $('driveDlg').addEventListener('click',e=>{if(e.target.id==='driveDlg')closeDriv
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('driveDlg').hidden)closeDriveDlg();});
 
 /* ---------- 시작 ---------- */
+try{setPenType(localStorage.getItem('pen:penType')||'cal');}catch(_){setPenType('cal');}
 syncSwatches();
 updateNib();
 if(!GOOGLE_CLIENT_ID){$('loginBtn').hidden=true;$('driveOpen').hidden=true;} // 클라이언트 ID가 없으면 로그인·드라이브 단추 숨김
