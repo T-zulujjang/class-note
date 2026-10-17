@@ -410,6 +410,7 @@ function setSize(pr){
 /* ---------- 레이저 펜: 빛나는 빨간 선, 펜을 떼면 잠시 뒤 서서히 사라짐 ---------- */
 const LASER_HOLD=800,LASER_FADE=600; // 펜을 뗀 뒤 그대로 보이는 시간, 사라지는 시간 (ms)
 let laserStrokes=[],hoverPt=null,laserRAF=0;
+const laserScale=()=>Math.max(0.3,(+$('size').value||10)/10); // 굵기 슬라이더 10 = 기본 굵기
 function kickLaser(){if(!laserRAF)laserRAF=requestAnimationFrame(drawLaser);}
 function laserPath(pts){
   lctx.beginPath();lctx.moveTo(pts[0].x*W,pts[0].y*W);
@@ -425,16 +426,18 @@ function drawLaser(){
   for(const s of laserStrokes){
     lctx.globalAlpha=s.end?Math.max(0,Math.min(1,1-(now-s.end-LASER_HOLD)/LASER_FADE)):1;
     laserPath(s.pts);
-    lctx.shadowColor='rgba(255,30,30,.9)';lctx.shadowBlur=14;
-    lctx.strokeStyle='rgba(255,45,45,.9)';lctx.lineWidth=6;lctx.stroke();
-    lctx.shadowBlur=0;lctx.strokeStyle='rgba(255,236,236,.95)';lctx.lineWidth=2;lctx.stroke();
+    const k=s.w||1; // 그을 때의 굵기
+    lctx.shadowColor='rgba(255,30,30,.9)';lctx.shadowBlur=14*Math.sqrt(k);
+    lctx.strokeStyle='rgba(255,45,45,.9)';lctx.lineWidth=6*k;lctx.stroke();
+    lctx.shadowBlur=0;lctx.strokeStyle='rgba(255,236,236,.95)';lctx.lineWidth=2*k;lctx.stroke();
   }
   lctx.globalAlpha=1;
   if(hoverPt&&tool==='laser'){ // 펜을 띄우고 있을 때도 빨간 점이 따라다님
     const x=hoverPt.x*W,y=hoverPt.y*W;
-    lctx.shadowColor='rgba(255,30,30,.9)';lctx.shadowBlur=16;
-    lctx.fillStyle='#FF2D2D';lctx.beginPath();lctx.arc(x,y,6,0,Math.PI*2);lctx.fill();
-    lctx.shadowBlur=0;lctx.fillStyle='#FFECEC';lctx.beginPath();lctx.arc(x,y,2.2,0,Math.PI*2);lctx.fill();
+    const k=laserScale();
+    lctx.shadowColor='rgba(255,30,30,.9)';lctx.shadowBlur=16*Math.sqrt(k);
+    lctx.fillStyle='#FF2D2D';lctx.beginPath();lctx.arc(x,y,Math.max(6*k,3),0,Math.PI*2);lctx.fill();
+    lctx.shadowBlur=0;lctx.fillStyle='#FFECEC';lctx.beginPath();lctx.arc(x,y,Math.max(2.2*k,1.2),0,Math.PI*2);lctx.fill();
   }
   if(laserStrokes.length)kickLaser();
 }
@@ -544,7 +547,7 @@ function updateNib(){
   const nib=$('nib'),size=+$('size').value;
   const marker=tool==='marker';
   if(tool==='laser'){ // 레이저일 땐 빨간 점으로 표시
-    nib.style.width=nib.style.height='10px';nib.style.borderRadius='50%';
+    nib.style.width=nib.style.height=Math.min(26,Math.max(4,10*laserScale()))+'px';nib.style.borderRadius='50%';
     nib.style.transform='none';nib.style.background='#FF2D2D';nib.style.opacity=1;
     nib.style.boxShadow='0 0 8px rgba(255,30,30,.8)';return;
   }
@@ -646,7 +649,7 @@ function inkDown(e){
   ink.setPointerCapture(e.pointerId);
   if(tool==='text'&&e.button!==5){textDown(pos(e));return;}
   if(tool==='laser'&&e.button!==5){
-    const p=pos(e);cur={laser:true,s:{pts:[p],end:null}};laserStrokes.push(cur.s);hoverPt=p;kickLaser();return;
+    const p=pos(e);cur={laser:true,s:{pts:[p],end:null,w:laserScale()}};laserStrokes.push(cur.s);hoverPt=p;kickLaser();return;
   }
   if(tool==='eraser'||e.button===5){cur={erase:true,changed:eraseAt(pos(e))};return;} // 펜 뒤쪽 지우개도 인식
   const marker=tool==='marker',size=+$('size').value;
@@ -741,7 +744,7 @@ function setTool(t){
   ink.classList.toggle('texting',t==='text');
   $('penCtl').hidden=t==='text';$('textCtl').hidden=t!=='text';
   $('penType').hidden=t!=='pen';$('penMenu').hidden=true;
-  $('angleCtl').hidden=t==='pen'&&penType!=='cal'; // 둥근 펜은 펜촉각이 필요 없음
+  $('angleCtl').hidden=(t==='pen'&&penType!=='cal')||t==='laser'; // 둥근 펜·레이저는 펜촉각이 필요 없음
   $('laserBtn').classList.toggle('on',t==='laser');
   ink.classList.toggle('laser',t==='laser');
   if(t!=='laser'){hoverPt=null;kickLaser();}
@@ -776,7 +779,7 @@ $('marker').onclick=()=>setTool('marker');
 $('eraser').onclick=()=>setTool('eraser');
 document.querySelectorAll('.sw[data-c]').forEach(el=>el.onclick=()=>setColor(el.dataset.c));
 $('customInput').addEventListener('input',e=>setColor(e.target.value));
-$('size').oninput=updateNib;
+$('size').oninput=()=>{updateNib();if(tool==='laser')kickLaser();}; // 레이저 점 크기도 바로 바뀜
 $('angle').oninput=updateNib;
 $('undo').onclick=()=>{commitText();if(strokes[page].pop()){redraw();markDirty();}};
 $('clear').onclick=()=>{commitText();if(confirm('이 페이지 필기를 모두 지울까요?')){strokes[page]=[];redraw();markDirty();}};
