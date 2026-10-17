@@ -49,6 +49,16 @@ button{font-family:inherit}
 #ink.laser{cursor:none}
 #laser{pointer-events:none} /* 레이저 층: 저장·되돌리기와 상관없이 잠깐 보였다 사라짐 */
 #ink.texting{cursor:text}
+#ink.imaging{cursor:default}
+/* 그림: 고른 그림의 테두리·크기 손잡이·지우기 단추 */
+#imgSel{position:absolute;z-index:6;border:2px solid var(--accent);border-radius:2px;cursor:move;touch-action:none;
+  box-shadow:0 0 0 1px rgba(255,255,255,.8)}
+#imgSel .rs{position:absolute;right:-12px;bottom:-12px;width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid var(--accent);
+  cursor:nwse-resize;touch-action:none}
+#imgSel .del{position:absolute;right:-14px;top:-14px;width:28px;height:28px;border:none;border-radius:50%;background:#DC2626;color:#fff;
+  display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(15,23,42,.25)}
+#imgSel .del svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round}
+#wrap.dropping{outline:3px dashed var(--accent);outline-offset:-10px}
 /* 바탕 무늬 고르기 */
 #bgMenu{position:fixed;z-index:45;width:min(360px,94vw);padding:12px;display:flex;flex-direction:column;gap:10px;background:#fff;
   border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
@@ -261,7 +271,7 @@ label.ib input{display:none}
 </head>
 <body>
 
-<div id="wrap"><div id="pages" hidden></div><div id="stage"><canvas id="bg"></canvas><canvas id="hl"></canvas><canvas id="ink"></canvas><canvas id="laser"></canvas><div id="links"></div><div id="textFrame" hidden></div><div id="textEdit" hidden contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="글상자 내용"></div><button id="textHandle" type="button" hidden title="끌어서 글상자 옮기기" aria-label="글상자 옮기기"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="m9 6 3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></button></div></div>
+<div id="wrap"><div id="pages" hidden></div><div id="stage"><canvas id="bg"></canvas><canvas id="hl"></canvas><canvas id="ink"></canvas><canvas id="laser"></canvas><div id="links"></div><div id="textFrame" hidden></div><div id="textEdit" hidden contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="글상자 내용"></div><div id="imgSel" hidden><span class="rs" title="끌어서 크기 바꾸기"></span><button class="del" type="button" title="그림 지우기 ( Delete )" aria-label="그림 지우기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div><button id="textHandle" type="button" hidden title="끌어서 글상자 옮기기" aria-label="글상자 옮기기"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="m9 6 3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></button></div></div>
 
 <!-- 상단: 확대·축소 + 페이지 -->
 <div id="top" class="float">
@@ -287,6 +297,8 @@ label.ib input{display:none}
   <button class="ib" id="marker" title="형광펜 ( H )" aria-label="형광펜"><svg viewBox="0 0 24 24"><path d="m9 11-6 6v3h3l6-6"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/><path d="M14 20h7"/></svg></button>
   <button class="ib" id="laserBtn" title="레이저 펜 ( L ) — 쓰고 나면 잠시 뒤 사라져요" aria-label="레이저 펜"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></button>
   <button class="ib" id="textBtn" title="글상자 ( T ) — 누른 자리에 글씨를 넣어요" aria-label="글상자"><svg viewBox="0 0 24 24"><path d="M5 7V5h14v2"/><path d="M12 5v14"/><path d="M9 19h6"/></svg></button>
+  <button class="ib" id="imgBtn" title="그림 ( I ) — 복사한 그림은 Ctrl+V로 붙여 넣어요" aria-label="그림"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg></button>
+  <input id="imgFile" type="file" accept="image/*" hidden>
   <button class="ib" id="eraser" title="지우개 ( E )" aria-label="지우개"><svg viewBox="0 0 24 24"><path d="M20 20H8l-4-4a2 2 0 0 1 0-2.8L13.2 4a2 2 0 0 1 2.8 0l4 4a2 2 0 0 1 0 2.8L11 20"/><path d="M7 11l6 6"/></svg></button>
   <div class="sep"></div>
   <div class="brk" aria-hidden="true"></div>
@@ -568,6 +580,7 @@ function drawSeg(s,a,b){
   c.closePath();c.fill();
 }
 function drawStroke(s){
+  if(s.type==='img'){drawImg(s);return;}
   if(s.type==='text'){drawText(s);return;}
   const pts=s.pts;
   if(pts.length===1){drawSeg(s,pts[0],{...pts[0],x:pts[0].x+0.0005});return;}
@@ -575,7 +588,10 @@ function drawStroke(s){
 }
 function redraw(){
   ctx.clearRect(0,0,W,H);hctx.clearRect(0,0,W,H);
-  for(const s of strokes[page])drawStroke(s);
+  const list=strokes[page]||[];
+  for(const s of list)if(s.type==='img')drawStroke(s); // 그림을 먼저 깔고
+  for(const s of list)if(s.type!=='img')drawStroke(s); // 그 위에 필기
+  if(imgSelItem)styleImgSel();
 }
 function pos(e){
   const r=ink.getBoundingClientRect();let p=e.pressure;
@@ -584,7 +600,7 @@ function pos(e){
 }
 function eraseAt(p){
   const r=0.012/zoom,before=strokes[page].length;
-  strokes[page]=strokes[page].filter(s=>s.type==='text'
+  strokes[page]=strokes[page].filter(s=>s.type==='img'?true:s.type==='text' // 그림은 지우개로 안 지워짐(× 단추로 지움)
     ?!(s._bb&&p.x>=s._bb.x0-r&&p.x<=s._bb.x1+r&&p.y>=s._bb.y0-r&&p.y<=s._bb.y1+r) // 글상자는 글씨 영역을 문지르면 지워짐
     :!s.pts.some(q=>Math.hypot(q.x-p.x,q.y-p.y)<r));
   if(strokes[page].length!==before){redraw();return true;}
@@ -674,7 +690,7 @@ let toastTimer;
 function toast(msg){const t=$('toast');t.textContent=msg;t.style.opacity=1;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.opacity=0,900);}
 async function goPage(n){
   if(n<0||n>=pageCount){toast(n<0?'첫 페이지예요':'마지막 페이지예요');return;}
-  commitText();
+  commitText();selectImg(null);
   if(vmode){ // 위아래 방식: 그 쪽으로 스크롤
     if(!slots[n])await renderPage();
     scrollToSlot(n);activate(n);toast((n+1)+' / '+pageCount);return;
@@ -696,6 +712,7 @@ function inkDown(e){
   if(e.ctrlKey){const l=linkAt(e.clientX,e.clientY);if(l){openLink(l);return;}} // Ctrl+클릭으로 링크 열기
   ink.setPointerCapture(e.pointerId);
   if(tool==='text'&&e.button!==5){textDown(pos(e));return;}
+  if(tool==='image'){selectImg(imgAt(pos(e)));return;} // 그림 고르기
   if(tool==='laser'&&e.button!==5){
     const p=pos(e);cur={laser:true,s:{pts:[p],end:null,w:laserScale()}};laserStrokes.push(cur.s);hoverPt=p;kickLaser();return;
   }
@@ -786,11 +803,12 @@ function endGesture(){
 /* ---------- 버튼 ---------- */
 function setTool(t){
   if(t!=='text')commitText();
+  if(t!=='image')selectImg(null);
   tool=t;
   ['pen','marker','eraser'].forEach(id=>$(id).classList.toggle('on',id===t));
-  $('textBtn').classList.toggle('on',t==='text');
-  ink.classList.toggle('texting',t==='text');
-  $('penCtl').hidden=t==='text';$('textCtl').hidden=t!=='text';
+  $('textBtn').classList.toggle('on',t==='text');$('imgBtn').classList.toggle('on',t==='image');
+  ink.classList.toggle('texting',t==='text');ink.classList.toggle('imaging',t==='image');
+  $('penCtl').hidden=t==='text'||t==='image';$('textCtl').hidden=t!=='text';
   $('penType').hidden=t!=='pen';$('penMenu').hidden=true;
   $('angleCtl').hidden=(t==='pen'&&penType!=='cal')||t==='laser'; // 둥근 펜·레이저는 펜촉각이 필요 없음
   $('laserBtn').classList.toggle('on',t==='laser');
@@ -823,13 +841,14 @@ document.querySelectorAll('#penMenu [data-pt]').forEach(b=>b.onclick=()=>{setPen
 document.addEventListener('click',e=>{if(!e.target.closest('#penMenu,#penType,#pen'))$('penMenu').hidden=true;});
 $('laserBtn').onclick=()=>setTool('laser');
 $('textBtn').onclick=()=>setTool('text');
+$('imgBtn').onclick=()=>{if(tool==='image')$('imgFile').click();else{setTool('image');toast('그림을 Ctrl+V로 붙여 넣거나, 그림 단추를 한 번 더 눌러 파일을 고르세요');}};
 $('marker').onclick=()=>setTool('marker');
 $('eraser').onclick=()=>setTool('eraser');
 document.querySelectorAll('.sw[data-c]').forEach(el=>el.onclick=()=>setColor(el.dataset.c));
 $('customInput').addEventListener('input',e=>setColor(e.target.value));
 $('size').oninput=()=>{updateNib();if(tool==='laser')kickLaser();}; // 레이저 점 크기도 바로 바뀜
 $('angle').oninput=updateNib;
-$('undo').onclick=()=>{commitText();if(strokes[page].pop()){redraw();markDirty();}};
+$('undo').onclick=()=>{commitText();selectImg(null);if(strokes[page].pop()){redraw();markDirty();}};
 $('clear').onclick=()=>{commitText();if(confirm('이 페이지 필기를 모두 지울까요?')){strokes[page]=[];redraw();markDirty();}};
 $('navPrev').onclick=()=>goPage(page-1);
 $('navNext').onclick=()=>goPage(page+1);
@@ -923,6 +942,8 @@ document.addEventListener('keydown',e=>{
     case 'p':setTool('pen');break;
     case 'h':setTool('marker');break;
     case 't':setTool('text');e.preventDefault();break;
+    case 'i':setTool('image');break;
+    case 'Delete':case 'Backspace':if(imgSelItem){deleteSelImg();e.preventDefault();}break;
     case 'l':setTool('laser');break;
     case 'g':openPgEdit();e.preventDefault();break;
     case 'f':toggleFullscreen();break;
@@ -967,12 +988,12 @@ function serialize(){
   return {v:1,app:'pen',key:docKey,base:baseKey,label:noteLabel,name:docName,pageCount,pg:page,updated:docUpdated,
     pm:pdf&&pmap.includes(0)?pmap.slice():undefined, // 끼워 넣은 빈 페이지 위치
     bg:bgs.some(b=>b&&b.t!=='plain')?Array.from({length:pageCount},(_,i)=>{const b=bgs[i];return b&&b.t!=='plain'?b.t+':'+b.g:0;}):undefined, // 바탕 무늬
-    pages:strokes.map(pg=>pg.map(s=>s.type==='text'
+    pages:strokes.map(pg=>pg.map(s=>s.type==='img'?{t:'i',x:r4(s.x),y:r4(s.y),w:r4(s.w),h:r4(s.h),d:s.src}:s.type==='text'
       ?{t:'x',x:r4(s.x),y:r4(s.y),r:s.runs.map(r=>r.c?[r.t,r.b?1:0,r.c]:[r.t,r.b?1:0]),fs:s.fs,c:s.color}
       :{c:s.color,s:r2(s.size),a:s.angle,m:s.marker?1:0,k:s.pt||undefined,p:s.pts.map(q=>[r4(q.x),r4(q.y),r2(q.p)])}))};
 }
 function applyData(d){
-  const pages=(d.pages||[]).map(pg=>pg.map(s=>s.t==='x'
+  const pages=(d.pages||[]).map(pg=>pg.map(s=>s.t==='i'?{type:'img',x:s.x,y:s.y,w:s.w,h:s.h,src:s.d}:s.t==='x'
     ?{type:'text',x:s.x,y:s.y,fs:s.fs||32,color:s.c,
       runs:s.r?s.r.map(r=>({t:r[0],b:!!r[1],c:r[2]||null})):[{t:s.tx||'',b:!!s.b,c:null}]} // 예전 형식(전체 굵기)도 읽음
     :{color:s.c,size:s.s,angle:s.a,marker:!!s.m,pt:s.k||null,pts:s.p.map(q=>({x:q[0],y:q[1],p:q[2]}))}));
@@ -1385,7 +1406,7 @@ function paintSlotInk(i){ // 판이 없는 쪽의 필기를 그림으로 보여 
   const oc=ctx,oh=hctx;
   ctx=sl.ink.getContext('2d');hctx=sl.hl.getContext('2d');
   ctx.setTransform(pr,0,0,pr,0,0);hctx.setTransform(pr,0,0,pr,0,0);
-  try{for(const st of strokes[i]||[])drawStroke(st);}finally{ctx=oc;hctx=oh;}
+  try{const L=strokes[i]||[];for(const st of L)if(st.type==='img')drawStroke(st);for(const st of L)if(st.type!=='img')drawStroke(st);}finally{ctx=oc;hctx=oh;}
 }
 function activate(n){ // 필기 판을 n쪽으로 옮김
   if(!vmode||n===page||!slots[n])return;
@@ -1443,6 +1464,113 @@ async function setMode(v){
 }
 $('modeBtn').onclick=()=>setMode(!vmode);
 wrap.classList.toggle('vmode',vmode);pagesEl.hidden=!vmode;updateModeBtn();
+
+/* ---------- 그림 붙여 넣기 ---------- */
+// Ctrl+V(복사한 그림·캡처), 그림 단추(파일 고르기), 끌어다 놓기로 지금 쪽에 그림을 넣음
+// 그림 도구에서 그림을 누르면 고르기 → 끌어서 옮기기, 오른쪽 아래 동그라미로 크기, ×로 지우기
+// 그림은 필기 아래에 깔리고, 반별 필기와 함께 저장됨(드라이브 용량을 아끼려고 알맞은 크기로 줄여 저장)
+const IMG_MAX=1600; // 긴 변 최대 픽셀
+let imgSelItem=null;
+function drawImg(s){
+  if(!s._img){
+    s._img=new Image();
+    s._img.onload=()=>{redraw();if(vmode)for(const i of visSlots)if(i!==page)paintSlotInk(i);};
+    s._img.src=s.src;
+  }
+  if(s._img.complete&&s._img.naturalWidth)ctx.drawImage(s._img,s.x*W,s.y*W,s.w*W,s.h*W);
+}
+function imgAt(p){
+  const list=strokes[page]||[];
+  for(let i=list.length-1;i>=0;i--){const s=list[i];
+    if(s.type==='img'&&p.x>=s.x&&p.x<=s.x+s.w&&p.y>=s.y&&p.y<=s.y+s.h)return s;}
+  return null;
+}
+function selectImg(s){
+  imgSelItem=s||null;$('imgSel').hidden=!imgSelItem;
+  if(imgSelItem)styleImgSel();
+}
+function styleImgSel(){
+  const el=$('imgSel'),s=imgSelItem;if(!s)return;
+  el.style.left=s.x*W+'px';el.style.top=s.y*W+'px';el.style.width=s.w*W+'px';el.style.height=s.h*W+'px';
+}
+function deleteSelImg(){
+  const s=imgSelItem;if(!s)return;
+  const list=strokes[page],i=list.indexOf(s);if(i>=0)list.splice(i,1);
+  selectImg(null);redraw();markDirty();toast('그림을 지웠어요');
+}
+// 고른 그림 옮기기·크기 바꾸기
+let imgDrag=null;
+$('imgSel').addEventListener('pointerdown',e=>{
+  if(!imgSelItem||e.target.closest('.del'))return;
+  e.preventDefault();e.stopPropagation();
+  $('imgSel').setPointerCapture(e.pointerId);
+  const s=imgSelItem;
+  imgDrag={resize:!!e.target.closest('.rs'),x:e.clientX,y:e.clientY,ox:s.x,oy:s.y,ow:s.w,oh:s.h,moved:false};
+});
+$('imgSel').addEventListener('pointermove',e=>{
+  if(!imgDrag||!imgSelItem)return;
+  const s=imgSelItem,dx=(e.clientX-imgDrag.x)/W,dy=(e.clientY-imgDrag.y)/W;
+  if(imgDrag.resize){ // 가로세로 비율 유지
+    const r=imgDrag.oh/imgDrag.ow,nw=Math.max(0.03,imgDrag.ow+Math.max(dx,dy/r));
+    s.w=nw;s.h=nw*r;
+  }else{s.x=imgDrag.ox+dx;s.y=imgDrag.oy+dy;}
+  imgDrag.moved=true;redraw();
+});
+const endImgDrag=()=>{if(imgDrag&&imgDrag.moved)markDirty();imgDrag=null;};
+$('imgSel').addEventListener('pointerup',endImgDrag);
+$('imgSel').addEventListener('pointercancel',endImgDrag);
+$('imgSel').querySelector('.del').onclick=e=>{e.stopPropagation();deleteSelImg();};
+// 그림 파일 → 알맞게 줄인 데이터
+function loadImage(src){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=src;});}
+function readAsDataURL(blob){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(blob);});}
+async function shrinkImage(blob){
+  const url=URL.createObjectURL(blob);
+  try{
+    const im=await loadImage(url),nw=im.naturalWidth,nh=im.naturalHeight;
+    if(!nw||!nh)throw new Error('empty');
+    const k=Math.min(1,IMG_MAX/Math.max(nw,nh));
+    if(k===1&&blob.size<400*1024&&/png|jpe?g|gif|webp/.test(blob.type)) // 작으면 원본 그대로(캡처 글씨가 또렷하게)
+      return {src:await readAsDataURL(blob),nw,nh};
+    const c=document.createElement('canvas');c.width=Math.round(nw*k);c.height=Math.round(nh*k);
+    const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);
+    let src=c.toDataURL('image/webp',0.88);
+    if(!src.startsWith('data:image/webp'))src=c.toDataURL('image/jpeg',0.88); // webp를 못 만드는 브라우저
+    return {src,nw:c.width,nh:c.height};
+  }finally{URL.revokeObjectURL(url);}
+}
+async function addImageBlob(blob){
+  if(!blob||!/^image\//.test(blob.type)){toast('그림 파일이 아니에요');return;}
+  commitText();
+  let r;try{r=await shrinkImage(blob);}catch(_){toast('그림을 읽지 못했어요');return;}
+  // 지금 화면에 보이는 쪽 가운데에 놓음
+  const ir=ink.getBoundingClientRect(),wr=wrap.getBoundingClientRect();
+  const cx=((Math.max(ir.left,wr.left)+Math.min(ir.right,wr.right))/2-ir.left)/W;
+  const cy=((Math.max(ir.top,wr.top)+Math.min(ir.bottom,wr.bottom))/2-ir.top)/W;
+  const w=Math.min(0.6,r.nw/W*0.9,0.95),h=w*r.nh/r.nw;
+  const s={type:'img',x:Math.max(0,cx-w/2),y:Math.max(0,cy-h/2),w,h,src:r.src};
+  strokes[page].push(s);
+  if(tool!=='image')setTool('image');
+  redraw();selectImg(s);markDirty();
+  toast('그림을 넣었어요 · 끌어서 옮기고, 모서리로 크기를 바꿔요');
+}
+document.addEventListener('paste',e=>{ // Ctrl+V
+  if(editing||e.target.isContentEditable||/^(INPUT|TEXTAREA)$/.test(e.target.tagName))return;
+  const items=[...(e.clipboardData&&e.clipboardData.items||[])];
+  const it=items.find(x=>x.kind==='file'&&/^image\//.test(x.type));
+  if(!it)return;
+  e.preventDefault();addImageBlob(it.getAsFile());
+});
+$('imgFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)addImageBlob(f);};
+// 끌어다 놓기: 그림이면 붙여 넣고, PDF면 학습지로 엶
+wrap.addEventListener('dragover',e=>{if([...e.dataTransfer.types].includes('Files')){e.preventDefault();wrap.classList.add('dropping');}});
+wrap.addEventListener('dragleave',e=>{if(e.target===wrap)wrap.classList.remove('dropping');});
+wrap.addEventListener('drop',async e=>{
+  wrap.classList.remove('dropping');
+  const f=e.dataTransfer.files&&e.dataTransfer.files[0];if(!f)return;
+  e.preventDefault();
+  if(/^image\//.test(f.type))addImageBlob(f);
+  else if(f.type==='application/pdf'){try{await openPdfBuffer(await f.arrayBuffer(),f.name,f.size);}catch(_){toast('PDF를 열 수 없어요');}}
+});
 
 /* ---------- 전체 화면 ---------- */
 // 주소창·탭을 숨기고 그림판만 화면 가득. 다시 누르거나 Esc로 돌아옴
