@@ -44,6 +44,19 @@ button{font-family:inherit}
 #ink.laser{cursor:none}
 #laser{pointer-events:none} /* 레이저 층: 저장·되돌리기와 상관없이 잠깐 보였다 사라짐 */
 #ink.texting{cursor:text}
+/* 바탕 무늬 고르기 */
+#bgMenu{position:fixed;z-index:45;width:min(360px,94vw);padding:12px;display:flex;flex-direction:column;gap:10px;background:#fff;
+  border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+#bgMenu .ttl{font-size:14px;font-weight:700;padding:0 2px}
+#bgTiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.bgt{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 4px;border:2px solid transparent;border-radius:10px;background:transparent;
+  font:inherit;font-size:11px;color:var(--ink);cursor:pointer}
+.bgt:hover{background:rgba(15,23,42,.05)}
+.bgt.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:700}
+.bgt canvas{width:56px;height:74px;border-radius:4px;box-shadow:0 0 0 1px var(--line)}
+#bgGap{display:flex;gap:4px;padding:2px;background:#F1F3F6;border-radius:10px}
+#bgGap button{flex:1;height:32px;border:none;border-radius:8px;background:transparent;font:inherit;font-size:13px;color:var(--muted);cursor:pointer}
+#bgGap button.on{background:#fff;color:var(--ink);font-weight:700;box-shadow:0 1px 3px rgba(15,23,42,.12)}
 /* 펜 종류 고르기 */
 #penType{height:36px;display:flex;align-items:center;gap:4px;padding:0 10px;margin-right:2px;border:1px solid var(--line);border-radius:10px;
   background:#fff;color:var(--ink);font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;flex:none}
@@ -113,7 +126,8 @@ button{font-family:inherit}
 #nib{width:4px;border-radius:2px;background:#111827;transition:transform .1s,height .1s,width .1s}
 .ctl{display:flex;align-items:center;gap:6px;padding:0 4px;flex:none;font-size:12px;color:var(--muted);white-space:nowrap}
 .ctl input{width:70px;accent-color:var(--accent);cursor:pointer}
-@media (max-width:1400px){.ctl span{display:none}} /* 화면이 좁으면 글자 이름은 숨기고 슬라이더만 (마우스를 올리면 이름이 보임) */
+@media (max-width:1400px){.ctl span{display:none}}
+@media (max-width:1180px){#sync span{display:none}} /* 위쪽 단추 줄과 겹치지 않게 저장 상태는 아이콘만 */ /* 화면이 좁으면 글자 이름은 숨기고 슬라이더만 (마우스를 올리면 이름이 보임) */
 label.ib input{display:none}
 
 /* 상단 확대·페이지 알약 */
@@ -237,6 +251,9 @@ label.ib input{display:none}
   <div class="sep"></div>
   <button id="pg" type="button" title="눌러서 쪽 번호로 바로 가기 ( G )" aria-label="쪽 번호로 바로 가기">1 / 1</button>
   <span id="pgEdit" hidden><input id="pgInput" type="number" inputmode="numeric" min="1" aria-label="이동할 쪽 번호"><span>/ <span id="pgTotal">1</span></span></span>
+  <button class="ib" id="bgBtn" hidden title="바탕 무늬 (줄·점·모눈·좌표평면·칠판)" aria-label="바탕 무늬"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 3v18"/></svg></button>
+  <button class="ib" id="delpg" hidden title="이 빈 페이지 빼기" aria-label="이 빈 페이지 빼기"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6"/><path d="M9 15h6"/></svg></button>
+  <button class="ib" id="addpg" title="지금 쪽 다음에 빈 페이지 넣기" aria-label="빈 페이지 넣기"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6"/><path d="M12 12v6M9 15h6"/></svg></button>
   <div class="sep"></div>
   <button id="noteBtn" type="button" title="반마다 따로 필기하기" aria-haspopup="true"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"/><path d="M4 19V5M8 7h7"/></svg><span id="noteName">기본</span></button>
 </div>
@@ -258,6 +275,7 @@ label.ib input{display:none}
     <button class="sw" style="background:#1D4FC4" data-c="#1D4FC4" title="파랑" aria-label="파랑"></button>
     <button class="sw" style="background:#7C3AED" data-c="#7C3AED" title="보라" aria-label="보라"></button>
     <button class="sw" style="background:#8B5A2B" data-c="#8B5A2B" title="갈색" aria-label="갈색"></button>
+    <button class="sw light" style="background:#FFFFFF" data-c="#FFFFFF" title="흰색 (칠판 바탕에)" aria-label="흰색"></button>
     <label class="sw" id="custom" title="색 직접 고르기" aria-label="색 직접 고르기"><input type="color" id="customInput" value="#E11D48"></label>
   </div>
   <div class="sep"></div>
@@ -277,8 +295,6 @@ label.ib input{display:none}
   <div class="sep"></div>
   <button class="ib" id="driveOpen" title="드라이브에 보관한 학습지 열기" aria-label="드라이브에서 학습지 열기"><svg viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 0 0 4.3 12 4 4 0 0 0 6 19.9"/><path d="M12 11v9M9 17l3 3 3-3"/></svg></button>
   <label class="ib" title="이 기기에서 PDF 열기" aria-label="이 기기에서 PDF 열기"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg><input id="file" type="file" accept="application/pdf"></label>
-  <button class="ib" id="delpg" hidden title="이 빈 페이지 빼기" aria-label="이 빈 페이지 빼기"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6"/><path d="M9 15h6"/></svg></button>
-  <button class="ib" id="addpg" title="지금 쪽 다음에 빈 페이지 넣기" aria-label="빈 페이지 넣기"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6"/><path d="M12 12v6M9 15h6"/></svg></button>
   <button class="ib" id="save" title="이미지로 저장" aria-label="이미지로 저장"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg></button>
 </div>
 
@@ -298,6 +314,13 @@ label.ib input{display:none}
   <button id="syncNow" type="button">지금 저장하기</button>
   <button id="logout" type="button">로그아웃</button>
   <div class="note">필기는 내 드라이브의 '판서 그림판' 폴더에 학습지별로 저장돼요. 필요 없으면 드라이브에서 직접 지우면 돼요.</div>
+</div>
+
+<!-- 바탕 무늬 -->
+<div id="bgMenu" hidden role="dialog" aria-label="바탕 무늬">
+  <div class="ttl">이 쪽의 바탕</div>
+  <div id="bgTiles"></div>
+  <div id="bgGap" role="group" aria-label="간격"><button type="button" data-g="s">촘촘하게</button><button type="button" data-g="m">보통</button><button type="button" data-g="l">넓게</button></div>
 </div>
 
 <!-- 펜 종류 -->
@@ -351,6 +374,7 @@ let penColor='#111827',markerColor='#FACC15',textColor='#111827'; // 펜·형광
 let textSize=32,textBold=false; // 글상자 기본 크기·굵기
 let W=0,H=0,zoom=1,blankRatio=null,renderTask=null,renderId=0;
 let pmap=[]; // 화면의 쪽 → PDF 쪽 번호(1부터). 0이면 중간에 끼워 넣은 빈 페이지
+let bgs=[]; // 쪽마다 바탕 무늬 {t:'plain'|'lines'|'dots'|'grid'|'axes'|'axesc'|'split'|'board', g:'s'|'m'|'l'} (빈 페이지에만 쓰임)
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const curColor=()=>tool==='marker'?markerColor:tool==='text'?textColor:penColor;
 
@@ -386,7 +410,7 @@ async function renderPage(){
     renderTask=p.render({canvasContext:bctx,viewport:p.getViewport({scale:(W/v0.width)*pr})});
     try{await renderTask.promise;}catch(_){return;}
   }else{
-    bctx.fillStyle='#fff';bctx.fillRect(0,0,bg.width,bg.height);
+    bctx.setTransform(pr,0,0,pr,0,0);drawPaper(bctx,W,H,bgOf(page));bctx.setTransform(1,0,0,1,0,0); // 빈 페이지 바탕 무늬
   }
   if(myId!==renderId)return;
   if(p){await loadLinks(p,v0);if(myId!==renderId)return;}
@@ -551,7 +575,7 @@ function updateNib(){
     nib.style.transform='none';nib.style.background='#FF2D2D';nib.style.opacity=1;
     nib.style.boxShadow='0 0 8px rgba(255,30,30,.8)';return;
   }
-  nib.style.boxShadow='none';
+  nib.style.boxShadow=/^#f[a-f0-9]f[a-f0-9]f[a-f0-9]$|^#fff$/i.test(curColor())?'0 0 0 1px rgba(15,23,42,.35)':'none'; // 흰색은 테두리로 보이게
   if(tool==='pen'&&penType!=='cal'){ // 둥근 펜은 동그라미로
     const d=Math.min(26,penType==='brush'?6+size*0.7:3+size*0.45);
     nib.style.width=nib.style.height=d+'px';nib.style.borderRadius='50%';nib.style.transform='none';
@@ -794,6 +818,7 @@ $('addpg').onclick=async()=>{
   const at=page+1;
   if(pdf)pmap.splice(at,0,0);
   strokes.splice(at,0,[]);pageCount++;
+  bgs.splice(at,0,inheritBg(at)); // 앞 빈 페이지의 바탕 무늬를 이어받음
   markDirty();
   if(vmode)await renderPage(); // 쪽 배치를 새로 깔고
   goPage(at);
@@ -805,14 +830,20 @@ $('delpg').onclick=async()=>{
   if(strokes[page].length&&!confirm('이 빈 페이지와 그 위의 필기를 지울까요?'))return;
   const at=page;
   if(pdf)pmap.splice(at,1);
-  strokes.splice(at,1);pageCount--;
+  strokes.splice(at,1);bgs.splice(at,1);pageCount--;
   page=Math.min(at,pageCount-1);
   if(vmode){slotsSig='';await renderPage();scrollToSlot(page);}
   else{await renderPage();wrap.scrollTop=0;}
   markDirty();toast('빈 페이지를 뺐어요');
 };
 function canDelPage(){return pdf?pmap[page]===0:pageCount>1;} // PDF 쪽은 못 지우고, 끼워 넣은 빈 페이지만
-function updatePageBtns(){$('delpg').hidden=!canDelPage();}
+function updatePageBtns(){
+  $('delpg').hidden=!canDelPage();$('bgBtn').hidden=!isBlankPage(page);if($('bgBtn').hidden)$('bgMenu').hidden=true;
+  // 칠판 쪽에선 검정 펜을 흰 분필로, 칠판이 아닌 쪽에선 흰 펜을 다시 검정으로
+  const board=isBlankPage(page)&&bgOf(page).t==='board',pc=penColor.toLowerCase();
+  if(board&&pc==='#111827'){penColor='#FFFFFF';syncSwatches();updateNib();}
+  else if(!board&&pc==='#ffffff'){penColor='#111827';syncSwatches();updateNib();}
+}
 $('file').onchange=async e=>{
   const f=e.target.files[0];if(!f)return;
   e.target.value='';
@@ -831,7 +862,7 @@ async function openPdfBuffer(buf,name,size){
   await flushSave(); // 앞에서 쓰던 학습지 필기 먼저 저장
   pdf=newPdf;curPdfBytes=new Uint8Array(buf);
   pageCount=pdf.numPages;page=0;zoom=1;strokes=Array.from({length:pageCount},()=>[]);
-  pmap=Array.from({length:pageCount},(_,i)=>i+1);
+  pmap=Array.from({length:pageCount},(_,i)=>i+1);bgs=[];
   baseKey=key;noteLabel=lastLabelOf(key);
   await openDoc(noteKeyOf(baseKey,noteLabel),name);
   await renderPage();if(!vmode)wrap.scrollTop=0;
@@ -841,7 +872,7 @@ async function openPdfBuffer(buf,name,size){
 }
 async function openBlank(){
   await flushSave();
-  pdf=null;curPdfBytes=null;pageCount=1;page=0;zoom=1;strokes=[[]];
+  pdf=null;curPdfBytes=null;pageCount=1;page=0;zoom=1;strokes=[[]];bgs=[];
   baseKey='blank';noteLabel=lastLabelOf('blank');
   await openDoc(noteKeyOf(baseKey,noteLabel),'빈 노트');
   await renderPage();if(!vmode)wrap.scrollTop=0;
@@ -910,6 +941,7 @@ function hasInk(){return strokes.some(pg=>pg.length);}
 function serialize(){
   return {v:1,app:'pen',key:docKey,base:baseKey,label:noteLabel,name:docName,pageCount,pg:page,updated:docUpdated,
     pm:pdf&&pmap.includes(0)?pmap.slice():undefined, // 끼워 넣은 빈 페이지 위치
+    bg:bgs.some(b=>b&&b.t!=='plain')?Array.from({length:pageCount},(_,i)=>{const b=bgs[i];return b&&b.t!=='plain'?b.t+':'+b.g:0;}):undefined, // 바탕 무늬
     pages:strokes.map(pg=>pg.map(s=>s.type==='text'
       ?{t:'x',x:r4(s.x),y:r4(s.y),r:s.runs.map(r=>r.c?[r.t,r.b?1:0,r.c]:[r.t,r.b?1:0]),fs:s.fs,c:s.color}
       :{c:s.color,s:r2(s.size),a:s.angle,m:s.marker?1:0,k:s.pt||undefined,p:s.pts.map(q=>[r4(q.x),r4(q.y),r2(q.p)])}))};
@@ -924,8 +956,10 @@ function applyData(d){
     pmap=Array.isArray(d.pm)&&d.pm.length&&d.pm.every(v=>Number.isInteger(v)&&v>=0&&v<=n)?d.pm.slice():Array.from({length:n},(_,i)=>i+1);
     pageCount=pmap.length;
     strokes=Array.from({length:pageCount},(_,i)=>pages[i]||[]);
+    bgs=readBgs(d.bg,pageCount);
   }else{
     pageCount=Math.max(1,pages.length);strokes=pages.length?pages:[[]];
+    bgs=readBgs(d.bg,pageCount);
   }
   page=Math.min(d.pg!=null?d.pg:page,pageCount-1); // 그 반이 마지막으로 보던 쪽
   docUpdated=d.updated||0;
@@ -1163,6 +1197,90 @@ async function driveSave(data,retry){
   driveIds[data.key]=r.id;
 }
 
+/* ---------- 빈 페이지 바탕 무늬 ---------- */
+// 무지·줄 노트·점 격자·모눈·좌표평면(1사분면/가운데)·2단·칠판. 쪽마다 따로 고르고 반별 필기에 함께 저장
+const BG_TYPES=[['plain','무지'],['lines','줄 노트'],['dots','점 격자'],['grid','모눈'],['axes','좌표(1사분면)'],['axesc','좌표(가운데)'],['split','2단'],['board','칠판']];
+const BG_GAP={s:0.025,m:0.033,l:0.045}; // 쪽 너비에 대한 칸 간격
+const BOARD='#23352B';
+function bgOf(i){return bgs[i]||{t:'plain',g:'m'};}
+function isBlankPage(i){return !pdf||!pmap[i];}
+function inheritBg(at){for(let j=at-1;j>=0;j--)if(isBlankPage(j)&&bgs[j])return {...bgs[j]};return null;}
+function bgSig(){return bgs.map(b=>b?b.t+b.g:'').join(',');}
+function readBgs(arr,n){
+  const ok=new Set(BG_TYPES.map(t=>t[0]));
+  return Array.from({length:n},(_,i)=>{
+    const v=Array.isArray(arr)?arr[i]:0;if(!v||typeof v!=='string')return null;
+    const [t,g]=v.split(':');return ok.has(t)?{t,g:BG_GAP[g]?g:'m'}:null;
+  });
+}
+function drawPaper(g,w,h,spec){ // g는 CSS 픽셀 단위로 맞춰 둔 붓
+  const t=spec.t,sp=w*(BG_GAP[spec.g]||BG_GAP.m),dark=t==='board';
+  g.fillStyle=dark?BOARD:'#fff';g.fillRect(0,0,w,h);
+  const line=(x1,y1,x2,y2)=>{g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke();};
+  const lw=Math.max(1,w/1100);
+  if(t==='lines'){
+    g.strokeStyle='rgba(37,99,235,.20)';g.lineWidth=lw;
+    for(let y=sp*2;y<h-sp*0.5;y+=sp)line(0,y,w,y);
+    g.strokeStyle='rgba(220,38,38,.22)';line(sp*2.5,0,sp*2.5,h); // 왼쪽 여백선
+  }else if(t==='dots'){
+    g.fillStyle='rgba(15,23,42,.30)';const r=Math.max(1.1,w/850);
+    for(let y=sp;y<h;y+=sp)for(let x=sp;x<w;x+=sp){g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill();}
+  }else if(t==='grid'||t==='axes'||t==='axesc'){
+    g.lineWidth=lw;
+    const ox=t==='axesc'?Math.round(w/2/sp)*sp:sp*3,oy=t==='axesc'?Math.round(h/2/sp)*sp:Math.floor((h-sp*2)/sp)*sp;
+    for(let k=0,x=0;x<=w;x+=sp,k++){g.strokeStyle=Math.round((x-ox)/sp)%5===0?'rgba(15,23,42,.17)':'rgba(15,23,42,.08)';line(x,0,x,h);}
+    for(let y=0;y<=h;y+=sp){g.strokeStyle=Math.round((y-oy)/sp)%5===0?'rgba(15,23,42,.17)':'rgba(15,23,42,.08)';line(0,y,w,y);}
+    if(t!=='grid'){ // 좌표축 + 화살표
+      const a=Math.max(8,sp*0.35),x0=t==='axesc'?sp:ox,y1=t==='axesc'?h-sp:oy;
+      g.strokeStyle='rgba(15,23,42,.7)';g.fillStyle='rgba(15,23,42,.7)';g.lineWidth=Math.max(1.6,w/650);
+      line(x0,oy,w-sp,oy);line(ox,y1,ox,sp);
+      g.beginPath();g.moveTo(w-sp+a*0.2,oy);g.lineTo(w-sp-a,oy-a*0.5);g.lineTo(w-sp-a,oy+a*0.5);g.closePath();g.fill();
+      g.beginPath();g.moveTo(ox,sp-a*0.2);g.lineTo(ox-a*0.5,sp+a);g.lineTo(ox+a*0.5,sp+a);g.closePath();g.fill();
+      g.lineWidth=Math.max(1.2,w/900);
+      for(let x=ox+sp*5;x<w-sp*2;x+=sp*5)line(x,oy-a*0.35,x,oy+a*0.35); // 눈금
+      for(let x=ox-sp*5;x>sp*1.5;x-=sp*5)line(x,oy-a*0.35,x,oy+a*0.35);
+      for(let y=oy-sp*5;y>sp*2;y-=sp*5)line(ox-a*0.35,y,ox+a*0.35,y);
+      for(let y=oy+sp*5;y<h-sp*1.5;y+=sp*5)line(ox-a*0.35,y,ox+a*0.35,y);
+    }
+  }else if(t==='split'){
+    g.strokeStyle='rgba(15,23,42,.22)';g.lineWidth=Math.max(1.4,w/800);
+    line(w/2,sp,w/2,h-sp);
+  }
+}
+function renderBgMenu(){
+  const cur=bgOf(page),box=$('bgTiles');box.textContent='';
+  for(const [t,name] of BG_TYPES){
+    const b=document.createElement('button');b.type='button';b.className='bgt'+(cur.t===t?' on':'');
+    const c=document.createElement('canvas'),dpr=window.devicePixelRatio||1;c.width=56*dpr;c.height=74*dpr;
+    const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);drawPaper(g,56,74,{t,g:'l'});
+    const sp=document.createElement('span');sp.textContent=name;
+    b.append(c,sp);b.onclick=()=>setPageBg({t,g:cur.g});box.appendChild(b);
+  }
+  document.querySelectorAll('#bgGap [data-g]').forEach(x=>x.classList.toggle('on',x.dataset.g===cur.g));
+}
+async function setPageBg(spec){
+  if(!isBlankPage(page))return;
+  const was=bgOf(page);
+  bgs[page]=spec.t==='plain'&&spec.g==='m'?null:{...spec};
+  if(spec.t==='board'&&was.t!=='board'&&penColor.toLowerCase()==='#111827'){ // 칠판엔 흰 분필로
+    penColor='#FFFFFF';syncSwatches();updateNib();toast('칠판이라 펜을 흰색으로 바꿨어요');
+  }
+  markDirty();renderBgMenu();
+  if(vmode&&slots[page]){slotsSig=layoutSig();for(const sl of slots)sl.bgFor=null;paintSlotBg(page);}
+  await renderPage();
+}
+function layoutSig(){return docKey+'|'+pageCount+'|'+Math.round(W)+'|'+(pdf?pmap.join(','):'b')+'|'+bgSig();}
+function openBgMenu(){
+  const m=$('bgMenu');if(!m.hidden){m.hidden=true;return;}
+  renderBgMenu();m.hidden=false;
+  const r=$('bgBtn').getBoundingClientRect();
+  m.style.left=Math.max(8,Math.min(innerWidth-m.offsetWidth-8,r.left+r.width/2-m.offsetWidth/2))+'px';
+  m.style.top=(r.top<innerHeight/2?r.bottom+10:Math.max(8,r.top-m.offsetHeight-10))+'px'; // 단추가 위에 있으면 아래로 펼침
+}
+$('bgBtn').onclick=e=>{e.stopPropagation();openBgMenu();};
+document.querySelectorAll('#bgGap [data-g]').forEach(x=>x.onclick=()=>setPageBg({t:bgOf(page).t,g:x.dataset.g}));
+document.addEventListener('click',e=>{if(!e.target.closest('#bgMenu,#bgBtn'))$('bgMenu').hidden=true;});
+
 /* ---------- 넘김 방식: 위아래(이어 보기) / 옆으로(한 쪽씩) ---------- */
 // 위아래 방식: 쪽마다 바탕 그림(PDF)과 필기 그림을 따로 그려 세로로 이어 붙이고,
 // 지금 쓰는 쪽 위에만 필기 판(#stage)을 얹음. 스크롤하거나 다른 쪽을 펜으로 누르면 그 쪽으로 판이 옮겨감
@@ -1184,7 +1302,7 @@ function ratioOf(i){
 }
 const slotPr=h=>Math.min(window.devicePixelRatio||1,Math.sqrt(8e6/(W*h)));
 function layoutSlots(){
-  const sig=docKey+'|'+pageCount+'|'+Math.round(W)+'|'+(pdf?pmap.join(','):'b');
+  const sig=docKey+'|'+pageCount+'|'+Math.round(W)+'|'+(pdf?pmap.join(','):'b')+'|'+bgSig();
   if(sig===slotsSig&&slots.length===pageCount)return false;
   slotsSig=sig;
   stage.remove();
@@ -1226,7 +1344,7 @@ async function paintSlotBg(i){
   c.width=Math.round(W*pr);c.height=Math.round(h*pr);c.style.width=W+'px';c.style.height=h+'px';
   const g=c.getContext('2d');
   const pn=pdf?pmap[i]||0:0;
-  if(!pn){g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);return;}
+  if(!pn){g.setTransform(pr,0,0,pr,0,0);drawPaper(g,W,h,bgOf(i));return;}
   try{
     const pp=await pdf.getPage(pn);if(slotsSig!==sig)return;
     const v0=pp.getViewport({scale:1});
@@ -1589,7 +1707,7 @@ async function switchLabel(lb){
   commitText();await flushSave();
   noteLabel=lb;lsSet(LS_LAST+baseKey,lb);
   if(pdf){pageCount=pdf.numPages;pmap=Array.from({length:pageCount},(_,i)=>i+1);} // 반마다 끼운 빈 페이지가 다름
-  strokes=pdf?Array.from({length:pageCount},()=>[]):[[]];if(!pdf)pageCount=1;
+  strokes=pdf?Array.from({length:pageCount},()=>[]):[[]];if(!pdf)pageCount=1;bgs=[];
   page=0;laserStrokes=[];
   await openDoc(noteKeyOf(baseKey,lb),docName);
   await renderPage();if(!vmode)wrap.scrollTop=0;
