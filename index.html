@@ -31,6 +31,17 @@ button{font-family:inherit}
 #stage canvas{position:absolute;left:0;top:0;border-radius:6px}
 #hl{opacity:.45;mix-blend-mode:multiply;pointer-events:none} /* 형광펜 층: 반투명, 글씨가 비쳐 보임 */
 #ink{touch-action:none;cursor:crosshair}
+#ink.laser{cursor:none}
+#laser{pointer-events:none} /* 레이저 층: 저장·되돌리기와 상관없이 잠깐 보였다 사라짐 */
+
+/* PDF 링크: 옅은 점선 상자 + 모서리의 링크 단추 */
+#links{position:absolute;inset:0;pointer-events:none}
+.lnk{position:absolute;border-radius:3px;background:rgba(36,87,214,.06);outline:1px dashed rgba(36,87,214,.35)}
+.lbadge{position:absolute;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:#2457D6;color:#fff;
+  display:grid;place-items:center;cursor:pointer;pointer-events:auto;transform:translate(-40%,-60%);
+  box-shadow:0 2px 6px rgba(15,23,42,.25);transition:transform .15s}
+.lbadge:hover{transform:translate(-40%,-60%) scale(1.15)}
+.lbadge svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 
 /* 공통 떠 있는 판 */
 .float{position:fixed;left:50%;transform:translateX(-50%);display:flex;align-items:center;
@@ -92,7 +103,7 @@ label.ib input{display:none}
 </head>
 <body>
 
-<div id="wrap"><div id="stage"><canvas id="bg"></canvas><canvas id="hl"></canvas><canvas id="ink"></canvas></div></div>
+<div id="wrap"><div id="stage"><canvas id="bg"></canvas><canvas id="hl"></canvas><canvas id="ink"></canvas><canvas id="laser"></canvas><div id="links"></div></div></div>
 
 <!-- 상단: 확대·축소 + 페이지 -->
 <div id="top" class="float">
@@ -108,6 +119,7 @@ label.ib input{display:none}
 <div id="bar" class="float" role="toolbar" aria-label="필기 도구">
   <button class="ib on" id="pen" title="펜 ( P )" aria-label="펜"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
   <button class="ib" id="marker" title="형광펜 ( H )" aria-label="형광펜"><svg viewBox="0 0 24 24"><path d="m9 11-6 6v3h3l6-6"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/><path d="M14 20h7"/></svg></button>
+  <button class="ib" id="laserBtn" title="레이저 펜 ( L ) — 쓰고 나면 잠시 뒤 사라져요" aria-label="레이저 펜"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></button>
   <button class="ib" id="eraser" title="지우개 ( E )" aria-label="지우개"><svg viewBox="0 0 24 24"><path d="M20 20H8l-4-4a2 2 0 0 1 0-2.8L13.2 4a2 2 0 0 1 2.8 0l4 4a2 2 0 0 1 0 2.8L11 20"/><path d="M7 11l6 6"/></svg></button>
   <div class="sep"></div>
   <div class="swatches" id="swatches">
@@ -143,8 +155,8 @@ label.ib input{display:none}
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const $=id=>document.getElementById(id);
-const bg=$('bg'),hl=$('hl'),ink=$('ink'),stage=$('stage'),wrap=$('wrap');
-const bctx=bg.getContext('2d'),hctx=hl.getContext('2d'),ctx=ink.getContext('2d');
+const bg=$('bg'),hl=$('hl'),ink=$('ink'),laser=$('laser'),stage=$('stage'),wrap=$('wrap');
+const bctx=bg.getContext('2d'),hctx=hl.getContext('2d'),ctx=ink.getContext('2d'),lctx=laser.getContext('2d');
 const MIN_ZOOM=0.5,MAX_ZOOM=4;
 const MARKER_SCALE=2.5; // 형광펜은 펜보다 굵게
 let pdf=null,page=0,pageCount=1,strokes=[[]],tool='pen',cur=null;
@@ -181,15 +193,107 @@ async function renderPage(){
     bctx.fillStyle='#fff';bctx.fillRect(0,0,bg.width,bg.height);
   }
   if(myId!==renderId)return;
+  if(pdf){await loadLinks(p,v0);if(myId!==renderId)return;}
+  else{pageLinks=[];}
+  renderLinks();
   $('pg').textContent=(page+1)+' / '+pageCount;
   $('zoomLbl').textContent=Math.round(zoom*100)+'%';
   redraw();
 }
 function setSize(pr){
   stage.style.width=W+'px';stage.style.height=H+'px';
-  for(const c of [bg,hl,ink]){c.width=Math.round(W*pr);c.height=Math.round(H*pr);c.style.width=W+'px';c.style.height=H+'px';}
+  for(const c of [bg,hl,ink,laser]){c.width=Math.round(W*pr);c.height=Math.round(H*pr);c.style.width=W+'px';c.style.height=H+'px';}
   ctx.setTransform(pr,0,0,pr,0,0);
   hctx.setTransform(pr,0,0,pr,0,0);
+  lctx.setTransform(pr,0,0,pr,0,0);
+}
+
+/* ---------- 레이저 펜: 빛나는 빨간 선, 펜을 떼면 잠시 뒤 서서히 사라짐 ---------- */
+const LASER_HOLD=800,LASER_FADE=600; // 펜을 뗀 뒤 그대로 보이는 시간, 사라지는 시간 (ms)
+let laserStrokes=[],hoverPt=null,laserRAF=0;
+function kickLaser(){if(!laserRAF)laserRAF=requestAnimationFrame(drawLaser);}
+function laserPath(pts){
+  lctx.beginPath();lctx.moveTo(pts[0].x*W,pts[0].y*W);
+  if(pts.length===1)lctx.lineTo(pts[0].x*W+0.1,pts[0].y*W);
+  for(let i=1;i<pts.length;i++)lctx.lineTo(pts[i].x*W,pts[i].y*W);
+}
+function drawLaser(){
+  laserRAF=0;
+  const now=performance.now();
+  lctx.clearRect(0,0,W,H);
+  laserStrokes=laserStrokes.filter(s=>!s.end||now-s.end<LASER_HOLD+LASER_FADE);
+  lctx.lineCap='round';lctx.lineJoin='round';
+  for(const s of laserStrokes){
+    lctx.globalAlpha=s.end?Math.max(0,Math.min(1,1-(now-s.end-LASER_HOLD)/LASER_FADE)):1;
+    laserPath(s.pts);
+    lctx.shadowColor='rgba(255,30,30,.9)';lctx.shadowBlur=14;
+    lctx.strokeStyle='rgba(255,45,45,.9)';lctx.lineWidth=6;lctx.stroke();
+    lctx.shadowBlur=0;lctx.strokeStyle='rgba(255,236,236,.95)';lctx.lineWidth=2;lctx.stroke();
+  }
+  lctx.globalAlpha=1;
+  if(hoverPt&&tool==='laser'){ // 펜을 띄우고 있을 때도 빨간 점이 따라다님
+    const x=hoverPt.x*W,y=hoverPt.y*W;
+    lctx.shadowColor='rgba(255,30,30,.9)';lctx.shadowBlur=16;
+    lctx.fillStyle='#FF2D2D';lctx.beginPath();lctx.arc(x,y,6,0,Math.PI*2);lctx.fill();
+    lctx.shadowBlur=0;lctx.fillStyle='#FFECEC';lctx.beginPath();lctx.arc(x,y,2.2,0,Math.PI*2);lctx.fill();
+  }
+  if(laserStrokes.length)kickLaser();
+}
+function clearLaser(){laserStrokes=[];kickLaser();}
+
+/* ---------- PDF 링크 ---------- */
+// 웹 주소 링크는 새 탭으로, 같은 PDF 안의 다른 쪽으로 가는 링크는 그 쪽으로 넘어감
+// 펜으로는 필기만 하고, 링크는 ① 모서리의 파란 단추 ② 손가락으로 톡 ③ Ctrl+클릭 으로 열림
+let pageLinks=[];
+const LINK_ICON='<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>';
+async function loadLinks(p,v0){
+  pageLinks=[];
+  try{
+    const vp=p.getViewport({scale:W/v0.width});
+    const anns=await p.getAnnotations({intent:'display'});
+    for(const a of anns){
+      if(a.subtype!=='Link')continue;
+      const url=a.url||a.unsafeUrl||null;
+      const safeUrl=url&&/^(https?:|mailto:)/i.test(url)?url:null;
+      if(!safeUrl&&!a.dest)continue;
+      const r=vp.convertToViewportRectangle(a.rect);
+      pageLinks.push({
+        x0:Math.min(r[0],r[2])/W,y0:Math.min(r[1],r[3])/W,
+        x1:Math.max(r[0],r[2])/W,y1:Math.max(r[1],r[3])/W,
+        url:safeUrl,dest:safeUrl?null:a.dest
+      });
+    }
+  }catch(_){pageLinks=[];}
+}
+function renderLinks(){
+  const box=$('links');box.textContent='';
+  for(const l of pageLinks){
+    const d=document.createElement('div');d.className='lnk';
+    d.style.left=l.x0*W+'px';d.style.top=l.y0*W+'px';
+    d.style.width=(l.x1-l.x0)*W+'px';d.style.height=(l.y1-l.y0)*W+'px';
+    const b=document.createElement('button');b.className='lbadge';b.innerHTML=LINK_ICON;
+    b.style.left=l.x1*W+'px';b.style.top=l.y0*W+'px';
+    const label=l.url?('링크 열기: '+l.url):'연결된 쪽으로 이동';
+    b.title=label;b.setAttribute('aria-label',label);
+    b.addEventListener('pointerdown',e=>e.stopPropagation());
+    b.onclick=()=>openLink(l);
+    box.appendChild(d);box.appendChild(b);
+  }
+}
+async function openLink(l){
+  if(l.url){window.open(l.url,'_blank','noopener');return;}
+  try{
+    let d=l.dest;
+    if(typeof d==='string')d=await pdf.getDestination(d);
+    if(!Array.isArray(d))return;
+    const ref=d[0];
+    const idx=typeof ref==='number'?ref:await pdf.getPageIndex(ref);
+    goPage(idx);
+  }catch(_){toast('이동할 쪽을 찾지 못했어요');}
+}
+function linkAt(cx,cy){
+  const r=ink.getBoundingClientRect(),x=(cx-r.left)/W,y=(cy-r.top)/W;
+  return pageLinks.find(l=>x>=l.x0&&x<=l.x1&&y>=l.y0&&y<=l.y1)||null;
 }
 
 /* ---------- 캘리그래피 펜 / 형광펜 ---------- */
@@ -229,6 +333,12 @@ function eraseAt(p){
 function updateNib(){
   const nib=$('nib'),size=+$('size').value;
   const marker=tool==='marker';
+  if(tool==='laser'){ // 레이저일 땐 빨간 점으로 표시
+    nib.style.width=nib.style.height='10px';nib.style.borderRadius='50%';
+    nib.style.transform='none';nib.style.background='#FF2D2D';nib.style.opacity=1;
+    nib.style.boxShadow='0 0 8px rgba(255,30,30,.8)';return;
+  }
+  nib.style.borderRadius='2px';nib.style.boxShadow='none';
   nib.style.height=Math.min(30,(8+size*0.75)*(marker?1.5:1))+'px';
   nib.style.width=(marker?6:4)+'px';
   nib.style.transform='rotate('+((+$('angle').value)-90)+'deg)';
@@ -245,7 +355,7 @@ function syncSwatches(){
   if(!found){$('custom').style.background=c;}
 }
 function setColor(c){
-  if(tool==='marker')markerColor=c;else{penColor=c;if(tool==='eraser')setTool('pen');}
+  if(tool==='marker')markerColor=c;else{penColor=c;if(tool==='eraser'||tool==='laser')setTool('pen');}
   syncSwatches();updateNib();
 }
 
@@ -294,7 +404,7 @@ let toastTimer;
 function toast(msg){const t=$('toast');t.textContent=msg;t.style.opacity=1;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.opacity=0,900);}
 async function goPage(n){
   if(n<0||n>=pageCount){toast(n<0?'첫 페이지예요':'마지막 페이지예요');return;}
-  page=n;await renderPage();wrap.scrollTop=0;wrap.scrollLeft=0;toast((page+1)+' / '+pageCount);
+  page=n;laserStrokes=[];await renderPage();wrap.scrollTop=0;wrap.scrollLeft=0;toast((page+1)+' / '+pageCount);
 }
 
 /* ---------- 입력: 펜·마우스=필기 / 손가락=넘기기·이동·확대 ---------- */
@@ -306,7 +416,11 @@ ink.addEventListener('pointerdown',e=>{
     touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
     startGesture();return;
   }
+  if(e.ctrlKey){const l=linkAt(e.clientX,e.clientY);if(l){openLink(l);return;}} // Ctrl+클릭으로 링크 열기
   ink.setPointerCapture(e.pointerId);
+  if(tool==='laser'&&e.button!==5){
+    const p=pos(e);cur={laser:true,s:{pts:[p],end:null}};laserStrokes.push(cur.s);hoverPt=p;kickLaser();return;
+  }
   if(tool==='eraser'||e.button===5){cur={erase:true};eraseAt(pos(e));return;} // 펜 뒤쪽 지우개도 인식
   const marker=tool==='marker',size=+$('size').value;
   cur={color:curColor(),size:marker?size*MARKER_SCALE:size,angle:+$('angle').value,marker,pts:[pos(e)]};
@@ -318,10 +432,12 @@ ink.addEventListener('pointermove',e=>{
     touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
     moveGesture();return;
   }
+  if(tool==='laser'){hoverPt=pos(e);kickLaser();}
   if(!cur)return;
   const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];
   for(const ev of evs){
     const p=pos(ev);
+    if(cur.laser){cur.s.pts.push(p);continue;}
     if(cur.erase){eraseAt(p);continue;}
     const last=cur.pts[cur.pts.length-1];
     p.p=last.p*0.6+p.p*0.4; // 필압 부드럽게
@@ -333,10 +449,12 @@ function endPointer(e){
     if(!touches.has(e.pointerId))return;
     touches.delete(e.pointerId);endGesture();return;
   }
+  if(cur&&cur.laser){cur.s.end=performance.now();kickLaser();}
   cur=null;
 }
 ink.addEventListener('pointerup',endPointer);
 ink.addEventListener('pointercancel',endPointer);
+ink.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch'){hoverPt=null;kickLaser();}});
 
 function startGesture(){
   const pts=[...touches.values()];
@@ -368,8 +486,12 @@ function endGesture(){
   }else if(gesture.type==='pan'&&touches.size===0){
     const dx=gesture.lx-gesture.sx,dy=gesture.ly-gesture.sy,dt=Date.now()-gesture.t;
     const overflowX=wrap.scrollWidth>wrap.clientWidth+2;
+    // 손가락으로 톡 누르면 그 자리의 링크 열기
+    if(Math.abs(dx)<10&&Math.abs(dy)<10&&dt<350){
+      const l=linkAt(gesture.lx,gesture.ly);if(l)openLink(l);
+    }
     // 가로로 넘칠 만큼 확대된 상태가 아니면, 옆으로 쓸어서 페이지 넘김
-    if(!overflowX&&Math.abs(dx)>80&&Math.abs(dx)>Math.abs(dy)*1.5&&dt<800){
+    else if(!overflowX&&Math.abs(dx)>80&&Math.abs(dx)>Math.abs(dy)*1.5&&dt<800){
       goPage(page+(dx<0?1:-1));
     }
   }
@@ -380,9 +502,13 @@ function endGesture(){
 function setTool(t){
   tool=t;
   ['pen','marker','eraser'].forEach(id=>$(id).classList.toggle('on',id===t));
+  $('laserBtn').classList.toggle('on',t==='laser');
+  ink.classList.toggle('laser',t==='laser');
+  if(t!=='laser'){hoverPt=null;kickLaser();}
   syncSwatches();updateNib();
 }
 $('pen').onclick=()=>setTool('pen');
+$('laserBtn').onclick=()=>setTool('laser');
 $('marker').onclick=()=>setTool('marker');
 $('eraser').onclick=()=>setTool('eraser');
 document.querySelectorAll('.sw[data-c]').forEach(el=>el.onclick=()=>setColor(el.dataset.c));
@@ -426,6 +552,7 @@ document.addEventListener('keydown',e=>{
   switch(e.key){
     case 'p':setTool('pen');break;
     case 'h':setTool('marker');break;
+    case 'l':setTool('laser');break;
     case 'e':setTool('eraser');break;
     case 'ArrowRight':case 'PageDown':goPage(page+1);e.preventDefault();break;
     case 'ArrowLeft':case 'PageUp':goPage(page-1);e.preventDefault();break;
