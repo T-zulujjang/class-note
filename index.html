@@ -6,6 +6,7 @@
 <title>캘리그래피 판서 그림판</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
   --bg:#ECEEF2; --dot:#C9CED8;
@@ -90,6 +91,35 @@ label.ib input{display:none}
 .side svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 #navPrev{left:28px}#navNext{right:28px}
 
+/* 오른쪽 위: 저장 상태 + 구글 계정 */
+#acct{position:fixed;top:16px;right:16px;z-index:35;display:flex;align-items:center;gap:6px;padding:6px;
+  background:var(--panel);border:1px solid var(--line);border-radius:999px;box-shadow:var(--shadow);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+#sync{display:flex;align-items:center;gap:6px;height:36px;padding:0 10px;border:none;border-radius:999px;background:transparent;
+  font-size:13px;color:var(--muted);cursor:default;white-space:nowrap}
+#sync svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+#sync.ok{color:#15803D}
+#sync.warn{color:#B45309;background:#FEF3C7;cursor:pointer}
+#sync.err{color:#B91C1C;background:#FEE2E2;cursor:pointer}
+#sync.busy svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loginBtn{height:36px;display:flex;align-items:center;gap:6px;padding:0 14px;border:none;border-radius:999px;
+  background:var(--accent);color:#fff;font-size:13px;font-weight:500;cursor:pointer}
+#loginBtn:hover{background:#1A3F9E}
+#loginBtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#avatar{width:36px;height:36px;border-radius:50%;border:none;padding:0;background:#E3ECFF;color:var(--accent);
+  font-weight:700;font-size:15px;cursor:pointer;overflow:hidden;display:grid;place-items:center}
+#avatar img{width:100%;height:100%;object-fit:cover}
+#acctMenu{position:fixed;top:68px;right:16px;z-index:36;width:260px;padding:14px;display:none;flex-direction:column;gap:4px;
+  background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+#acctMenu.open{display:flex}
+#acctMenu .who{padding:2px 6px 10px;border-bottom:1px solid var(--sep);margin-bottom:6px}
+#acctMenu .who b{display:block;font-size:14px}
+#acctMenu .who span{font-size:12px;color:var(--muted);word-break:break-all}
+#acctMenu button{height:40px;text-align:left;padding:0 10px;border:none;border-radius:8px;background:transparent;font-size:14px;color:var(--ink);cursor:pointer}
+#acctMenu button:hover{background:rgba(15,23,42,.06)}
+#acctMenu .note{font-size:12px;color:var(--muted);padding:6px 10px 0;line-height:1.5}
+
 #toast{position:fixed;left:50%;top:80px;transform:translateX(-50%);background:rgba(31,36,48,.85);color:#fff;
   padding:8px 18px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:40}
 
@@ -98,6 +128,10 @@ label.ib input{display:none}
   #wrap{padding:76px 12px 96px}
   .side{display:none}
   .ctl span{display:none}
+  #sync span{display:none}
+  #loginBtn span{display:none}
+  #acct{top:auto;bottom:86px;right:12px}
+  #acctMenu{top:auto;bottom:140px;right:12px}
 }
 </style>
 </head>
@@ -150,9 +184,30 @@ label.ib input{display:none}
 <button class="side" id="navPrev" title="이전 페이지 ( ← )" aria-label="이전 페이지"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
 <button class="side" id="navNext" title="다음 페이지 ( → )" aria-label="다음 페이지"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
 
+<!-- 오른쪽 위: 저장 상태 + 구글 로그인 -->
+<div id="acct">
+  <button id="sync" type="button"><svg viewBox="0 0 24 24"></svg><span>이 기기에 저장</span></button>
+  <button id="loginBtn" type="button" title="구글 계정으로 로그인하면 내 구글 드라이브에 필기가 저장돼요"><svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></svg><span>구글 로그인</span></button>
+  <button id="avatar" type="button" aria-label="내 계정" hidden></button>
+</div>
+<div id="acctMenu" role="menu">
+  <div class="who"><b id="whoName"></b><span id="whoEmail"></span></div>
+  <button id="openFolder" type="button">드라이브에서 저장 파일 보기</button>
+  <button id="syncNow" type="button">지금 저장하기</button>
+  <button id="logout" type="button">로그아웃</button>
+  <div class="note">필기는 내 드라이브의 '판서 그림판' 폴더에 학습지별로 저장돼요. 필요 없으면 드라이브에서 직접 지우면 돼요.</div>
+</div>
+
 <div id="toast"></div>
 
 <script>
+/* ==========================================================
+   구글 클라이언트 ID — 구글 클라우드 콘솔에서 받은 값을 따옴표 안에 붙여 넣으세요.
+   예: '1234567890-abcdefg.apps.googleusercontent.com'
+   비워 두면 로그인 없이 '이 기기에 저장'만 동작해요.
+   ========================================================== */
+const GOOGLE_CLIENT_ID='';
+
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const $=id=>document.getElementById(id);
 const bg=$('bg'),hl=$('hl'),ink=$('ink'),laser=$('laser'),stage=$('stage'),wrap=$('wrap');
@@ -327,7 +382,8 @@ function pos(e){
 function eraseAt(p){
   const r=0.012/zoom,before=strokes[page].length;
   strokes[page]=strokes[page].filter(s=>!s.pts.some(q=>Math.hypot(q.x-p.x,q.y-p.y)<r));
-  if(strokes[page].length!==before)redraw();
+  if(strokes[page].length!==before){redraw();return true;}
+  return false;
 }
 // 펜촉 미리보기: 도구·굵기·각도·색이 바뀌면 같이 바뀜
 function updateNib(){
@@ -421,7 +477,7 @@ ink.addEventListener('pointerdown',e=>{
   if(tool==='laser'&&e.button!==5){
     const p=pos(e);cur={laser:true,s:{pts:[p],end:null}};laserStrokes.push(cur.s);hoverPt=p;kickLaser();return;
   }
-  if(tool==='eraser'||e.button===5){cur={erase:true};eraseAt(pos(e));return;} // 펜 뒤쪽 지우개도 인식
+  if(tool==='eraser'||e.button===5){cur={erase:true,changed:eraseAt(pos(e))};return;} // 펜 뒤쪽 지우개도 인식
   const marker=tool==='marker',size=+$('size').value;
   cur={color:curColor(),size:marker?size*MARKER_SCALE:size,angle:+$('angle').value,marker,pts:[pos(e)]};
   strokes[page].push(cur);drawStroke(cur);
@@ -438,7 +494,7 @@ ink.addEventListener('pointermove',e=>{
   for(const ev of evs){
     const p=pos(ev);
     if(cur.laser){cur.s.pts.push(p);continue;}
-    if(cur.erase){eraseAt(p);continue;}
+    if(cur.erase){if(eraseAt(p))cur.changed=true;continue;}
     const last=cur.pts[cur.pts.length-1];
     p.p=last.p*0.6+p.p*0.4; // 필압 부드럽게
     cur.pts.push(p);drawSeg(cur,last,p);
@@ -450,6 +506,7 @@ function endPointer(e){
     touches.delete(e.pointerId);endGesture();return;
   }
   if(cur&&cur.laser){cur.s.end=performance.now();kickLaser();}
+  else if(cur&&(!cur.erase||cur.changed))markDirty(); // 한 획 끝날 때마다 자동 저장 예약
   cur=null;
 }
 ink.addEventListener('pointerup',endPointer);
@@ -515,8 +572,8 @@ document.querySelectorAll('.sw[data-c]').forEach(el=>el.onclick=()=>setColor(el.
 $('customInput').addEventListener('input',e=>setColor(e.target.value));
 $('size').oninput=updateNib;
 $('angle').oninput=updateNib;
-$('undo').onclick=()=>{strokes[page].pop();redraw();};
-$('clear').onclick=()=>{if(confirm('이 페이지 필기를 모두 지울까요?')){strokes[page]=[];redraw();}};
+$('undo').onclick=()=>{if(strokes[page].pop()){redraw();markDirty();}};
+$('clear').onclick=()=>{if(confirm('이 페이지 필기를 모두 지울까요?')){strokes[page]=[];redraw();markDirty();}};
 $('navPrev').onclick=()=>goPage(page-1);
 $('navNext').onclick=()=>goPage(page+1);
 $('zoomIn').onclick=()=>zoomTo(zoom*1.25);
@@ -524,15 +581,21 @@ $('zoomOut').onclick=()=>zoomTo(zoom/1.25);
 $('zoomFit').onclick=()=>zoomTo(1);
 $('addpg').onclick=()=>{
   if(pdf)return toast('PDF를 연 상태에서는 빈 페이지를 추가할 수 없어요');
-  strokes.push([]);pageCount++;goPage(pageCount-1);
+  strokes.push([]);pageCount++;markDirty();goPage(pageCount-1);
 };
 $('file').onchange=async e=>{
   const f=e.target.files[0];if(!f)return;
+  e.target.value='';
+  let newPdf,key;
   try{
-    pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
+    const buf=await f.arrayBuffer();
+    key=await docKeyOf(buf,f); // 같은 PDF면 어느 기기에서 열어도 같은 열쇠 → 필기를 찾아 불러옴
+    newPdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
   }catch(_){toast('PDF를 열 수 없어요');return;}
-  pageCount=pdf.numPages;page=0;zoom=1;strokes=Array.from({length:pageCount},()=>[]);
-  await renderPage();wrap.scrollTop=0;e.target.value='';
+  await flushSave(); // 앞에서 쓰던 학습지 필기 먼저 저장
+  pdf=newPdf;pageCount=pdf.numPages;page=0;zoom=1;strokes=Array.from({length:pageCount},()=>[]);
+  await openDoc(key,f.name);
+  await renderPage();wrap.scrollTop=0;
   toast(f.name);
 };
 $('save').onclick=()=>{
@@ -563,9 +626,267 @@ document.addEventListener('keydown',e=>{
 });
 let resizeTimer;
 window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(renderPage,150);});
+
+/* ==========================================================
+   저장·불러오기
+   - 항상: 이 기기(브라우저)에 자동 저장 → 로그인 안 해도 같은 기기에서 이어 쓰기
+   - 로그인하면: 내 구글 드라이브 '판서 그림판' 폴더에도 자동 저장 → 다른 기기에서 이어 쓰기
+   - 드라이브 권한은 drive.file: 이 그림판이 만든 파일만 보고 고칠 수 있음
+   ========================================================== */
+const DRIVE='https://www.googleapis.com/drive/v3',UPLOAD='https://www.googleapis.com/upload/drive/v3';
+const SCOPE='https://www.googleapis.com/auth/drive.file';
+const LS_HINT='pen:loginHint',LS_DOC='pen:doc:';
+let docKey=null,docName='',docUpdated=0,driveDirty=false,saveTimer=null,saveChain=Promise.resolve();
+let tokenClient=null,accessToken=null,tokenExp=0,user=null,folderId=null,driveIds={},lsWarned=false;
+const lsGet=k=>{try{return localStorage.getItem(k);}catch(_){return null;}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v);return true;}catch(_){return false;}};
+const lsDel=k=>{try{localStorage.removeItem(k);}catch(_){}};
+const r4=v=>Math.round(v*1e4)/1e4,r2=v=>Math.round(v*100)/100;
+
+async function docKeyOf(buf,f){
+  try{
+    const h=new Uint8Array(await crypto.subtle.digest('SHA-256',buf));
+    return 'pdf-'+[...h.slice(0,12)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }catch(_){ // 아주 오래된 브라우저용 예비 열쇠
+    return 'pdf-'+(f.name+'-'+f.size).replace(/[^A-Za-z0-9]/g,'').slice(0,40);
+  }
+}
+function hasInk(){return strokes.some(pg=>pg.length);}
+function serialize(){
+  return {v:1,app:'pen',key:docKey,name:docName,pageCount,updated:docUpdated,
+    pages:strokes.map(pg=>pg.map(s=>({c:s.color,s:r2(s.size),a:s.angle,m:s.marker?1:0,
+      p:s.pts.map(q=>[r4(q.x),r4(q.y),r2(q.p)])})))};
+}
+function applyData(d){
+  const pages=(d.pages||[]).map(pg=>pg.map(s=>({color:s.c,size:s.s,angle:s.a,marker:!!s.m,
+    pts:s.p.map(q=>({x:q[0],y:q[1],p:q[2]}))})));
+  if(pdf){ // PDF 쪽수에 맞춤
+    strokes=Array.from({length:pageCount},(_,i)=>pages[i]||[]);
+  }else{
+    pageCount=Math.max(1,pages.length);strokes=pages.length?pages:[[]];
+  }
+  page=Math.min(page,pageCount-1);
+  docUpdated=d.updated||0;
+}
+function readLocal(key){try{return JSON.parse(lsGet(LS_DOC+key));}catch(_){return null;}}
+
+/* 상태 표시 */
+const ICONS={
+  device:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  cloud:'<path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 0 0 4.3 12 4 4 0 0 0 6 19.9Z"/><path d="m9 14 2 2 4-4"/>',
+  sync:'<path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5M3 21v-5h5"/>',
+  link:'<path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 0 0 4.3 12 4 4 0 0 0 6 19.9Z"/><path d="M12 11v5M9.5 13.5 12 11l2.5 2.5"/>',
+  alert:'<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>'
+};
+let syncState='local';
+function setSync(state){
+  syncState=state;
+  const b=$('sync'),map={
+    local:['device','이 기기에 저장됨',''],
+    pending:['sync','저장 대기',''],
+    saving:['sync','저장 중…','busy'],
+    loading:['sync','불러오는 중…','busy'],
+    saved:['cloud','드라이브에 저장됨','ok'],
+    reconnect:['link','드라이브 다시 연결','warn'],
+    error:['alert','저장 실패 · 다시 시도','err']
+  }[state];
+  b.querySelector('svg').innerHTML=ICONS[map[0]];
+  b.querySelector('span').textContent=map[1];
+  b.className=map[2];
+  b.title={reconnect:'눌러서 구글 드라이브에 다시 연결해요',error:'눌러서 다시 저장해요',local:user?'':'로그인하면 드라이브에도 저장돼요'}[state]||'';
+}
+$('sync').onclick=()=>{
+  if(syncState==='reconnect')connect('');
+  else if(syncState==='error')flushSave();
+};
+
+/* 자동 저장 */
+function markDirty(){
+  docUpdated=Date.now();driveDirty=true;
+  if(accessToken)setSync('pending');
+  clearTimeout(saveTimer);saveTimer=setTimeout(flushSave,2500);
+}
+function saveLocalNow(){
+  if(!docKey)return;
+  if(!lsSet(LS_DOC+docKey,JSON.stringify(serialize()))&&!lsWarned){
+    lsWarned=true;toast('이 기기 저장 공간이 꽉 찼어요. 로그인해서 드라이브에 저장해 주세요');
+  }
+}
+function flushSave(){
+  clearTimeout(saveTimer);
+  saveChain=saveChain.then(async()=>{
+    if(!docKey)return;
+    saveLocalNow();
+    if(!driveDirty){if(!accessToken)setSync(offlineState());return;}
+    if(!accessToken){setSync(offlineState());return;}
+    setSync('saving');
+    try{await driveSave(serialize());driveDirty=false;setSync('saved');}
+    catch(_){if(accessToken)setSync('error');}
+  });
+  return saveChain;
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)flushSave();});
+window.addEventListener('beforeunload',e=>{
+  clearTimeout(saveTimer);saveLocalNow(); // 이 기기에는 바로 저장
+  if(driveDirty&&accessToken){e.preventDefault();e.returnValue='';} // 드라이브 저장이 덜 끝났으면 한 번 물어봄
+});
+
+/* 학습지 열 때: 이 기기·드라이브 중 더 최근 필기를 불러옴 */
+async function openDoc(key,name){
+  docKey=key;docName=name;docUpdated=0;driveDirty=false;
+  const local=readLocal(key);
+  let remote=null;
+  if(accessToken){setSync('loading');try{remote=await driveLoad(key);}catch(_){}}
+  const best=[local,remote].filter(Boolean).sort((a,b)=>(b.updated||0)-(a.updated||0))[0];
+  if(best&&best.pages&&best.pages.some(pg=>pg.length)){applyData(best);toast('저장해 둔 필기를 불러왔어요');}
+  // 이 기기 쪽이 더 최근이면 드라이브에 올려 둠
+  if(local&&(!remote||(local.updated||0)>(remote.updated||0))&&local.pages&&local.pages.some(pg=>pg.length))driveDirty=true;
+  if(accessToken){driveDirty?flushSave():setSync('saved');}
+  else setSync(offlineState());
+}
+
+/* ---------- 구글 로그인 ---------- */
+function gisReady(){return !!(window.google&&google.accounts&&google.accounts.oauth2);}
+function connect(prompt){
+  if(!GOOGLE_CLIENT_ID){toast('아직 구글 클라이언트 ID가 설정되지 않았어요');return Promise.resolve(false);}
+  if(location.protocol==='file:'){toast('구글 로그인은 웹 주소로 열었을 때만 돼요');return Promise.resolve(false);}
+  if(!gisReady()){toast('구글 로그인 준비 중이에요. 잠시 후 다시 눌러 주세요');return Promise.resolve(false);}
+  if(!tokenClient)tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:GOOGLE_CLIENT_ID,scope:SCOPE,
+    callback:async r=>{
+      const done=pendingLogin;pendingLogin=null;
+      if(r.error||!google.accounts.oauth2.hasGrantedAllScopes(r,SCOPE)){
+        toast('드라이브 저장 권한을 허용해야 저장할 수 있어요');if(done)done(false);return;
+      }
+      accessToken=r.access_token;tokenExp=Date.now()+((+r.expires_in||3600)-60)*1000;
+      await afterLogin();if(done)done(true);
+    },
+    error_callback:()=>{const done=pendingLogin;pendingLogin=null;if(done)done(false);} // 창을 닫았거나 팝업이 막힘
+  });
+  if(pendingLogin)return Promise.resolve(false); // 이미 로그인 창이 떠 있음
+  return new Promise(res=>{
+    pendingLogin=res;
+    const hint=lsGet(LS_HINT);
+    tokenClient.requestAccessToken(hint?{prompt,login_hint:hint}:{prompt});
+  });
+}
+let pendingLogin=null;
+function offlineState(){return (user||(GOOGLE_CLIENT_ID&&lsGet(LS_HINT)))?'reconnect':'local';}
+async function afterLogin(){
+  try{
+    const a=await (await api(DRIVE+'/about?fields=user(displayName,emailAddress,photoLink)')).json();
+    user=a.user;lsSet(LS_HINT,user.emailAddress);
+  }catch(_){user={displayName:'',emailAddress:''};}
+  showUser();
+  if(!docKey)return;
+  // 지금 열린 학습지: 드라이브 쪽이 더 최근이면 불러오고, 화면 쪽이 더 최근이면 올림
+  setSync('loading');
+  let remote=null;try{remote=await driveLoad(docKey);}catch(_){}
+  const remoteHas=remote&&remote.pages&&remote.pages.some(pg=>pg.length);
+  if(remoteHas&&(remote.updated||0)>docUpdated){
+    if(!hasInk()||confirm('드라이브에 더 최근에 저장된 필기가 있어요. 불러올까요?\n(지금 화면의 필기는 바뀌어요)')){
+      applyData(remote);saveLocalNow();driveDirty=false;await renderPage();setSync('saved');
+      toast('드라이브의 필기를 불러왔어요');return;
+    }
+  }
+  if(hasInk()){driveDirty=true;flushSave();}else setSync('saved');
+}
+function showUser(){
+  const logged=!!user;
+  $('loginBtn').hidden=logged;$('avatar').hidden=!logged;
+  if(!logged)return;
+  const av=$('avatar');av.textContent='';
+  if(user.photoLink){const img=document.createElement('img');img.src=user.photoLink;img.alt='';img.referrerPolicy='no-referrer';av.appendChild(img);}
+  else av.textContent=(user.displayName||user.emailAddress||'?').trim().charAt(0).toUpperCase();
+  $('whoName').textContent=user.displayName||'구글 계정';
+  $('whoEmail').textContent=user.emailAddress||'';
+}
+$('loginBtn').onclick=()=>connect('select_account');
+$('avatar').onclick=e=>{e.stopPropagation();$('acctMenu').classList.toggle('open');};
+document.addEventListener('click',e=>{if(!e.target.closest('#acctMenu'))$('acctMenu').classList.remove('open');});
+$('openFolder').onclick=async()=>{
+  $('acctMenu').classList.remove('open');
+  const w=window.open('about:blank','_blank'); // 팝업 차단을 피하려고 먼저 창을 엶
+  try{const id=await ensureFolder();if(w)w.location.href='https://drive.google.com/drive/folders/'+id;}
+  catch(_){if(w)w.close();toast('드라이브에 연결되지 않았어요');}
+};
+$('syncNow').onclick=()=>{$('acctMenu').classList.remove('open');driveDirty=true;flushSave();};
+$('logout').onclick=async()=>{
+  $('acctMenu').classList.remove('open');
+  await flushSave();
+  if(accessToken&&gisReady())google.accounts.oauth2.revoke(accessToken,()=>{});
+  accessToken=null;user=null;folderId=null;driveIds={};lsDel(LS_HINT);
+  showUser();setSync('local');toast('로그아웃했어요. 필기는 이 기기에 계속 저장돼요');
+};
+// 전에 로그인했던 기기라면: 처음 버튼을 누를 때 자동으로 다시 연결 (구글 창이 잠깐 떴다 닫힘)
+// 한 시간쯤 지나 연결이 풀렸을 때도 같은 방식으로 다시 연결
+document.addEventListener('click',e=>{
+  if(syncState!=='reconnect'||!lsGet(LS_HINT))return;
+  if(!e.target.closest('#bar,#top,.side')||e.target.closest('input'))return;
+  connect('');
+},true);
+
+/* ---------- 드라이브 API ---------- */
+async function api(url,opts={}){
+  if(!accessToken||Date.now()>tokenExp){accessToken=null;setSync('reconnect');throw new Error('no token');}
+  const r=await fetch(url,{...opts,headers:{...(opts.headers||{}),Authorization:'Bearer '+accessToken}});
+  if(r.status===401){accessToken=null;setSync('reconnect');throw new Error('401');}
+  if(!r.ok){const err=new Error('http '+r.status);err.status=r.status;throw err;}
+  return r;
+}
+async function ensureFolder(){
+  if(folderId)return folderId;
+  const q=encodeURIComponent("mimeType='application/vnd.google-apps.folder' and appProperties has { key='penApp' and value='folder' } and trashed=false");
+  const j=await (await api(DRIVE+'/files?q='+q+'&fields=files(id)')).json();
+  if(j.files&&j.files.length){folderId=j.files[0].id;return folderId;}
+  const c=await (await api(DRIVE+'/files?fields=id',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:'판서 그림판',mimeType:'application/vnd.google-apps.folder',appProperties:{penApp:'folder'}})})).json();
+  folderId=c.id;return folderId;
+}
+async function findDocFile(key){
+  const q=encodeURIComponent("appProperties has { key='penKey' and value='"+key+"' } and trashed=false");
+  const j=await (await api(DRIVE+'/files?q='+q+'&fields=files(id)&orderBy=modifiedTime desc')).json();
+  return (j.files&&j.files[0])||null;
+}
+async function driveLoad(key){
+  const f=await findDocFile(key);
+  if(!f){delete driveIds[key];return null;}
+  driveIds[key]=f.id;
+  return await (await api(DRIVE+'/files/'+f.id+'?alt=media')).json();
+}
+function fileNameOf(name){return (name||'빈 노트').replace(/\.pdf$/i,'').replace(/[\\/:*?"<>|]/g,'_').slice(0,80)+' 필기.json';}
+async function driveSave(data,retry){
+  const body=JSON.stringify(data);
+  let id=driveIds[data.key];
+  if(!id){const f=await findDocFile(data.key);id=f&&f.id;}
+  if(id){
+    try{
+      await api(UPLOAD+'/files/'+id+'?uploadType=media',{method:'PATCH',headers:{'Content-Type':'application/json'},body});
+      driveIds[data.key]=id;return;
+    }catch(e){
+      if(e.status!==404||retry)throw e;
+      delete driveIds[data.key];return driveSave(data,true); // 드라이브에서 파일을 지웠으면 새로 만듦
+    }
+  }
+  const parent=await ensureFolder();
+  const meta={name:fileNameOf(data.name),mimeType:'application/json',parents:[parent],appProperties:{penKey:data.key}};
+  const bd='pen'+Math.random().toString(36).slice(2);
+  const mp='--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(meta)+
+           '\r\n--'+bd+'\r\nContent-Type: application/json\r\n\r\n'+body+'\r\n--'+bd+'--';
+  const r=await (await api(UPLOAD+'/files?uploadType=multipart&fields=id',{method:'POST',
+    headers:{'Content-Type':'multipart/related; boundary='+bd},body:mp})).json();
+  driveIds[data.key]=r.id;
+}
+
+/* ---------- 시작 ---------- */
 syncSwatches();
 updateNib();
-renderPage();
+if(!GOOGLE_CLIENT_ID)$('loginBtn').hidden=true; // 클라이언트 ID가 없으면 로그인 단추 숨김
+(async()=>{
+  await openDoc('blank','빈 노트');
+  if(GOOGLE_CLIENT_ID&&lsGet(LS_HINT))setSync('reconnect'); // 전에 로그인한 기기
+  renderPage();
+})();
 </script>
 </body>
 </html>
