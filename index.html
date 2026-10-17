@@ -112,7 +112,8 @@ button{font-family:inherit}
 .nibbox{width:32px;height:32px;flex:none;display:grid;place-items:center}
 #nib{width:4px;border-radius:2px;background:#111827;transition:transform .1s,height .1s,width .1s}
 .ctl{display:flex;align-items:center;gap:6px;padding:0 4px;flex:none;font-size:12px;color:var(--muted);white-space:nowrap}
-.ctl input{width:80px;accent-color:var(--accent);cursor:pointer}
+.ctl input{width:70px;accent-color:var(--accent);cursor:pointer}
+@media (max-width:1400px){.ctl span{display:none}} /* 화면이 좁으면 글자 이름은 숨기고 슬라이더만 (마우스를 올리면 이름이 보임) */
 label.ib input{display:none}
 
 /* 상단 확대·페이지 알약 */
@@ -263,8 +264,8 @@ label.ib input{display:none}
   <div class="grp" id="penCtl">
   <button id="penType" type="button" title="펜 종류 고르기" aria-haspopup="true"><span id="penTypeName">캘리그래피</span><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
   <div class="nibbox" title="펜촉 미리보기"><div id="nib"></div></div>
-  <label class="ctl"><span>굵기</span><input id="size" type="range" min="2" max="30" value="10" aria-label="굵기"></label>
-  <label class="ctl" id="angleCtl"><span>펜촉각</span><input id="angle" type="range" min="0" max="180" value="45" aria-label="펜촉각"></label>
+  <label class="ctl"><span>굵기</span><input id="size" type="range" min="2" max="30" value="10" aria-label="굵기" title="굵기"></label>
+  <label class="ctl" id="angleCtl"><span>펜촉각</span><input id="angle" type="range" min="0" max="180" value="45" aria-label="펜촉각" title="펜촉각"></label>
   </div>
   <div class="grp" id="textCtl" hidden>
   <label class="ctl"><span>글씨 크기</span><input id="fsize" type="number" min="8" max="300" value="32" inputmode="numeric" aria-label="글씨 크기"></label>
@@ -276,7 +277,8 @@ label.ib input{display:none}
   <div class="sep"></div>
   <button class="ib" id="driveOpen" title="드라이브에 보관한 학습지 열기" aria-label="드라이브에서 학습지 열기"><svg viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 0 0 4.3 12 4 4 0 0 0 6 19.9"/><path d="M12 11v9M9 17l3 3 3-3"/></svg></button>
   <label class="ib" title="이 기기에서 PDF 열기" aria-label="이 기기에서 PDF 열기"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg><input id="file" type="file" accept="application/pdf"></label>
-  <button class="ib" id="addpg" title="빈 페이지 추가" aria-label="빈 페이지 추가"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6"/><path d="M12 12v6M9 15h6"/></svg></button>
+  <button class="ib" id="delpg" hidden title="이 빈 페이지 빼기" aria-label="이 빈 페이지 빼기"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6"/><path d="M9 15h6"/></svg></button>
+  <button class="ib" id="addpg" title="지금 쪽 다음에 빈 페이지 넣기" aria-label="빈 페이지 넣기"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6"/><path d="M12 12v6M9 15h6"/></svg></button>
   <button class="ib" id="save" title="이미지로 저장" aria-label="이미지로 저장"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg></button>
 </div>
 
@@ -348,6 +350,7 @@ let pdf=null,page=0,pageCount=1,strokes=[[]],tool='pen',cur=null;
 let penColor='#111827',markerColor='#FACC15',textColor='#111827'; // 펜·형광펜·글상자는 색을 따로 기억
 let textSize=32,textBold=false; // 글상자 기본 크기·굵기
 let W=0,H=0,zoom=1,blankRatio=null,renderTask=null,renderId=0;
+let pmap=[]; // 화면의 쪽 → PDF 쪽 번호(1부터). 0이면 중간에 끼워 넣은 빈 페이지
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const curColor=()=>tool==='marker'?markerColor:tool==='text'?textColor:penColor;
 
@@ -364,9 +367,11 @@ async function renderPage(){
   const inner=innerSize(),baseW=Math.max(200,inner.w);
   if(blankRatio===null)blankRatio=Math.max(0.6,inner.h/baseW);
   let v0=null,p=null;
-  if(pdf){p=await pdf.getPage(page+1);if(myId!==renderId)return;v0=p.getViewport({scale:1});}
+  if(pdf){await ensureRatios();if(myId!==renderId)return;}
+  const pn=pdf?pmap[page]||0:0; // 0: 빈 페이지
+  if(pn){p=await pdf.getPage(pn);if(myId!==renderId)return;v0=p.getViewport({scale:1});}
   W=baseW*zoom;
-  H=pdf?v0.height*(W/v0.width):W*blankRatio;
+  H=p?v0.height*(W/v0.width):W*ratioOf(page);
   let rebuilt=false;
   if(vmode){
     await ensureRatios();if(myId!==renderId)return;
@@ -376,7 +381,7 @@ async function renderPage(){
   const dpr=window.devicePixelRatio||1;
   const pr=Math.min(dpr,Math.sqrt(16e6/(W*H)));
   setSize(pr);
-  if(pdf){
+  if(p){
     if(renderTask){try{renderTask.cancel();}catch(_){}}
     renderTask=p.render({canvasContext:bctx,viewport:p.getViewport({scale:(W/v0.width)*pr})});
     try{await renderTask.promise;}catch(_){return;}
@@ -384,11 +389,12 @@ async function renderPage(){
     bctx.fillStyle='#fff';bctx.fillRect(0,0,bg.width,bg.height);
   }
   if(myId!==renderId)return;
-  if(pdf){await loadLinks(p,v0);if(myId!==renderId)return;}
+  if(p){await loadLinks(p,v0);if(myId!==renderId)return;}
   else{pageLinks=[];}
   renderLinks();
   if(editing)styleEditor();
   $('pg').textContent=(page+1)+' / '+pageCount;
+  updatePageBtns();
   $('zoomLbl').textContent=Math.round(zoom*100)+'%';
   redraw();
   if(rebuilt)scrollToSlot(page);
@@ -481,7 +487,8 @@ async function openLink(l){
     if(!Array.isArray(d))return;
     const ref=d[0];
     const idx=typeof ref==='number'?ref:await pdf.getPageIndex(ref);
-    goPage(idx);
+    const at=pmap.indexOf(idx+1); // 빈 페이지를 끼웠으면 화면 쪽 번호가 달라짐
+    if(at>=0)goPage(at);
   }catch(_){toast('이동할 쪽을 찾지 못했어요');}
 }
 function linkAt(cx,cy){
@@ -778,10 +785,31 @@ $('navNext').onclick=()=>goPage(page+1);
 $('zoomIn').onclick=()=>zoomTo(zoom*1.25);
 $('zoomOut').onclick=()=>zoomTo(zoom/1.25);
 $('zoomFit').onclick=()=>zoomTo(1);
-$('addpg').onclick=()=>{
-  if(pdf)return toast('PDF를 연 상태에서는 빈 페이지를 추가할 수 없어요');
-  strokes.push([]);pageCount++;markDirty();goPage(pageCount-1);
+// 빈 페이지: 지금 쪽 바로 뒤에 끼워 넣음 (PDF 원본은 그대로, 반별 필기에 함께 저장)
+$('addpg').onclick=async()=>{
+  commitText();
+  const at=page+1;
+  if(pdf)pmap.splice(at,0,0);
+  strokes.splice(at,0,[]);pageCount++;
+  markDirty();
+  if(vmode)await renderPage(); // 쪽 배치를 새로 깔고
+  goPage(at);
+  toast((at+1)+'쪽에 빈 페이지를 넣었어요');
 };
+$('delpg').onclick=async()=>{
+  if(!canDelPage())return;
+  commitText();
+  if(strokes[page].length&&!confirm('이 빈 페이지와 그 위의 필기를 지울까요?'))return;
+  const at=page;
+  if(pdf)pmap.splice(at,1);
+  strokes.splice(at,1);pageCount--;
+  page=Math.min(at,pageCount-1);
+  if(vmode){slotsSig='';await renderPage();scrollToSlot(page);}
+  else{await renderPage();wrap.scrollTop=0;}
+  markDirty();toast('빈 페이지를 뺐어요');
+};
+function canDelPage(){return pdf?pmap[page]===0:pageCount>1;} // PDF 쪽은 못 지우고, 끼워 넣은 빈 페이지만
+function updatePageBtns(){$('delpg').hidden=!canDelPage();}
 $('file').onchange=async e=>{
   const f=e.target.files[0];if(!f)return;
   e.target.value='';
@@ -800,6 +828,7 @@ async function openPdfBuffer(buf,name,size){
   await flushSave(); // 앞에서 쓰던 학습지 필기 먼저 저장
   pdf=newPdf;curPdfBytes=new Uint8Array(buf);
   pageCount=pdf.numPages;page=0;zoom=1;strokes=Array.from({length:pageCount},()=>[]);
+  pmap=Array.from({length:pageCount},(_,i)=>i+1);
   baseKey=key;noteLabel=lastLabelOf(key);
   await openDoc(noteKeyOf(baseKey,noteLabel),name);
   await renderPage();if(!vmode)wrap.scrollTop=0;
@@ -877,6 +906,7 @@ async function docKeyOf(buf,f){
 function hasInk(){return strokes.some(pg=>pg.length);}
 function serialize(){
   return {v:1,app:'pen',key:docKey,base:baseKey,label:noteLabel,name:docName,pageCount,pg:page,updated:docUpdated,
+    pm:pdf&&pmap.includes(0)?pmap.slice():undefined, // 끼워 넣은 빈 페이지 위치
     pages:strokes.map(pg=>pg.map(s=>s.type==='text'
       ?{t:'x',x:r4(s.x),y:r4(s.y),r:s.runs.map(r=>r.c?[r.t,r.b?1:0,r.c]:[r.t,r.b?1:0]),fs:s.fs,c:s.color}
       :{c:s.color,s:r2(s.size),a:s.angle,m:s.marker?1:0,k:s.pt||undefined,p:s.pts.map(q=>[r4(q.x),r4(q.y),r2(q.p)])}))};
@@ -887,6 +917,9 @@ function applyData(d){
       runs:s.r?s.r.map(r=>({t:r[0],b:!!r[1],c:r[2]||null})):[{t:s.tx||'',b:!!s.b,c:null}]} // 예전 형식(전체 굵기)도 읽음
     :{color:s.c,size:s.s,angle:s.a,marker:!!s.m,pt:s.k||null,pts:s.p.map(q=>({x:q[0],y:q[1],p:q[2]}))}));
   if(pdf){ // PDF 쪽수에 맞춤
+    const n=pdf.numPages;
+    pmap=Array.isArray(d.pm)&&d.pm.length&&d.pm.every(v=>Number.isInteger(v)&&v>=0&&v<=n)?d.pm.slice():Array.from({length:n},(_,i)=>i+1);
+    pageCount=pmap.length;
     strokes=Array.from({length:pageCount},(_,i)=>pages[i]||[]);
   }else{
     pageCount=Math.max(1,pages.length);strokes=pages.length?pages:[[]];
@@ -1141,10 +1174,14 @@ async function ensureRatios(){ // 쪽마다 세로/가로 비율
   for(let i=0;i<doc.numPages;i++){const pp=await doc.getPage(i+1),v=pp.getViewport({scale:1});arr.push(v.height/v.width);}
   if(doc===pdf){pageRatios=arr;ratiosFor=doc;}
 }
-const ratioOf=i=>pdf?(pageRatios[i]||1.414):blankRatio;
+function ratioOf(i){
+  if(!pdf)return blankRatio;
+  for(let j=i;j>=0;j--)if(pmap[j])return pageRatios[pmap[j]-1]||1.414; // 빈 페이지는 앞쪽 PDF 쪽과 같은 크기
+  const f=pmap.find(v=>v);return f?pageRatios[f-1]||1.414:1.414;
+}
 const slotPr=h=>Math.min(window.devicePixelRatio||1,Math.sqrt(8e6/(W*h)));
 function layoutSlots(){
-  const sig=docKey+'|'+pageCount+'|'+Math.round(W)+'|'+(pdf?'p':'b');
+  const sig=docKey+'|'+pageCount+'|'+Math.round(W)+'|'+(pdf?pmap.join(','):'b');
   if(sig===slotsSig&&slots.length===pageCount)return false;
   slotsSig=sig;
   stage.remove();
@@ -1185,9 +1222,10 @@ async function paintSlotBg(i){
   const h=W*ratioOf(i),pr=slotPr(h),c=sl.bg;
   c.width=Math.round(W*pr);c.height=Math.round(h*pr);c.style.width=W+'px';c.style.height=h+'px';
   const g=c.getContext('2d');
-  if(!pdf){g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);return;}
+  const pn=pdf?pmap[i]||0:0;
+  if(!pn){g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);return;}
   try{
-    const pp=await pdf.getPage(i+1);if(slotsSig!==sig)return;
+    const pp=await pdf.getPage(pn);if(slotsSig!==sig)return;
     const v0=pp.getViewport({scale:1});
     await pp.render({canvasContext:g,viewport:pp.getViewport({scale:(W/v0.width)*pr})}).promise;
   }catch(_){if(slots[i]===sl)sl.bgFor=null;}
@@ -1210,7 +1248,7 @@ function activate(n){ // 필기 판을 n쪽으로 옮김
   paintSlotInk(old);
   H=W*ratioOf(n);setSize(Math.min(window.devicePixelRatio||1,Math.sqrt(16e6/(W*H))));
   attachStage();redraw();
-  $('pg').textContent=(page+1)+' / '+pageCount;
+  $('pg').textContent=(page+1)+' / '+pageCount;updatePageBtns();
   renderPage(); // 판의 바탕·링크는 뒤이어 채움
   if(hasInk())markDirty(); // 반마다 보던 쪽 기억
 }
@@ -1547,6 +1585,7 @@ async function switchLabel(lb){
   if(lb===noteLabel)return;
   commitText();await flushSave();
   noteLabel=lb;lsSet(LS_LAST+baseKey,lb);
+  if(pdf){pageCount=pdf.numPages;pmap=Array.from({length:pageCount},(_,i)=>i+1);} // 반마다 끼운 빈 페이지가 다름
   strokes=pdf?Array.from({length:pageCount},()=>[]):[[]];if(!pdf)pageCount=1;
   page=0;laserStrokes=[];
   await openDoc(noteKeyOf(baseKey,lb),docName);
