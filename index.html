@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<!-- 태블릿 홈 화면에 추가하면 주소창 없이 앱처럼 열림 -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="판서 그림판">
 <title>캘리그래피 판서 그림판</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -226,14 +231,31 @@ label.ib input{display:none}
   padding:8px 18px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:40}
 
 /* 좁은 화면(세로 태블릿 등) */
+#pg{white-space:nowrap}
+/* 태블릿 등 좁은 화면: 아래 도구 막대를 두 줄로 */
+.brk{display:none}
+@media (max-width:1180px){
+  /* 1줄: 도구 · 되돌리기 · 파일 / 2줄: 색 · 펜 설정 */
+  #bar{flex-wrap:wrap;justify-content:center;overflow:visible;row-gap:4px;column-gap:2px;max-width:calc(100vw - 24px);
+    left:12px;right:12px;transform:none;margin:0 auto;width:fit-content} /* 가운데 정렬은 그대로, 너비는 화면만큼 쓸 수 있게 */
+  #bar>.sep{display:none}
+  #pen,#marker,#laserBtn,#textBtn,#eraser{order:1}
+  #undo,#clear{order:2;margin-left:4px}
+  #driveOpen,#bar>label.ib,#save{order:3}
+  #driveOpen{margin-left:4px}
+  .brk{display:block;order:4;flex-basis:100%;height:0}
+  #swatches{order:5}
+  #penCtl,#textCtl{order:6;margin-left:6px}
+  #wrap{padding-bottom:140px}
+}
 @media (max-width:900px){
-  #wrap{padding:76px 12px 96px}
+  #wrap{padding:76px 12px 140px}
   .side{display:none}
   .ctl span{display:none}
   #sync span{display:none}
   #loginBtn span{display:none}
-  #acct{top:auto;bottom:86px;right:12px}
-  #acctMenu{top:auto;bottom:140px;right:12px}
+  #acct{top:auto;bottom:136px;right:12px}
+  #acctMenu{top:auto;bottom:190px;right:12px}
 }
 </style>
 </head>
@@ -248,6 +270,7 @@ label.ib input{display:none}
   <button class="ib" id="zoomIn" title="확대 ( + )" aria-label="확대"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
   <button class="ib" id="zoomFit" title="화면 맞춤 ( 0 )" aria-label="화면 맞춤"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
   <button class="ib" id="modeBtn" title="넘김 방식 바꾸기" aria-label="넘김 방식 바꾸기"><svg viewBox="0 0 24 24"></svg></button>
+  <button class="ib" id="fsBtn" title="전체 화면 ( F )" aria-label="전체 화면"><svg viewBox="0 0 24 24"></svg></button>
   <div class="sep"></div>
   <button id="pg" type="button" title="눌러서 쪽 번호로 바로 가기 ( G )" aria-label="쪽 번호로 바로 가기">1 / 1</button>
   <span id="pgEdit" hidden><input id="pgInput" type="number" inputmode="numeric" min="1" aria-label="이동할 쪽 번호"><span>/ <span id="pgTotal">1</span></span></span>
@@ -266,6 +289,7 @@ label.ib input{display:none}
   <button class="ib" id="textBtn" title="글상자 ( T ) — 누른 자리에 글씨를 넣어요" aria-label="글상자"><svg viewBox="0 0 24 24"><path d="M5 7V5h14v2"/><path d="M12 5v14"/><path d="M9 19h6"/></svg></button>
   <button class="ib" id="eraser" title="지우개 ( E )" aria-label="지우개"><svg viewBox="0 0 24 24"><path d="M20 20H8l-4-4a2 2 0 0 1 0-2.8L13.2 4a2 2 0 0 1 2.8 0l4 4a2 2 0 0 1 0 2.8L11 20"/><path d="M7 11l6 6"/></svg></button>
   <div class="sep"></div>
+  <div class="brk" aria-hidden="true"></div>
   <div class="swatches" id="swatches">
     <button class="sw on" style="background:#111827" data-c="#111827" title="검정" aria-label="검정"></button>
     <button class="sw" style="background:#D2312B" data-c="#D2312B" title="빨강" aria-label="빨강"></button>
@@ -901,6 +925,7 @@ document.addEventListener('keydown',e=>{
     case 't':setTool('text');e.preventDefault();break;
     case 'l':setTool('laser');break;
     case 'g':openPgEdit();e.preventDefault();break;
+    case 'f':toggleFullscreen();break;
     case 'e':setTool('eraser');break;
     case 'ArrowRight':case 'PageDown':goPage(page+1);e.preventDefault();break;
     case 'ArrowLeft':case 'PageUp':goPage(page-1);e.preventDefault();break;
@@ -1418,6 +1443,39 @@ async function setMode(v){
 }
 $('modeBtn').onclick=()=>setMode(!vmode);
 wrap.classList.toggle('vmode',vmode);pagesEl.hidden=!vmode;updateModeBtn();
+
+/* ---------- 전체 화면 ---------- */
+// 주소창·탭을 숨기고 그림판만 화면 가득. 다시 누르거나 Esc로 돌아옴
+const FS_ICON={
+  on:'<path d="M15 3h6v6M9 21H3v-6"/><path d="m21 3-7 7M3 21l7-7"/>',
+  off:'<path d="M4 14h6v6M20 10h-6V4"/><path d="m14 10 7-7M3 21l7-7"/>'
+};
+const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement||null;
+const fsSupported=()=>!!(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen);
+const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+function updateFsBtn(){
+  const on=!!fsEl(),b=$('fsBtn');
+  b.querySelector('svg').innerHTML=on?FS_ICON.off:FS_ICON.on;
+  const t=on?'전체 화면 끝내기 ( F 또는 Esc )':'전체 화면 ( F )';b.title=t;b.setAttribute('aria-label',t);
+  b.hidden=standalone()&&!fsSupported(); // 홈 화면 앱으로 열었으면 이미 전체 화면이라 숨김
+}
+async function toggleFullscreen(){
+  commitText();
+  try{
+    if(fsEl()){
+      if(document.exitFullscreen)await document.exitFullscreen();else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
+    }else{
+      const el=document.documentElement;
+      if(el.requestFullscreen)await el.requestFullscreen({navigationUI:'hide'});
+      else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
+      else{toast('이 기기는 전체 화면을 지원하지 않아요. 공유 → 홈 화면에 추가로 열면 주소창 없이 쓸 수 있어요');return;}
+    }
+  }catch(_){toast('전체 화면으로 바꾸지 못했어요');}
+}
+$('fsBtn').onclick=toggleFullscreen;
+document.addEventListener('fullscreenchange',updateFsBtn);
+document.addEventListener('webkitfullscreenchange',updateFsBtn);
+updateFsBtn();
 
 /* ---------- 쪽 번호로 바로 가기 ---------- */
 // 위쪽 '3 / 12'를 누르면 숫자 칸으로 바뀜 → 번호 입력 후 Enter
