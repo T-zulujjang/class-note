@@ -323,16 +323,30 @@ body.clock-mode:not(.ck-light){--ck-bg:#0E1116;--ck-panel:rgba(255,255,255,.08);
 #clockView.timing #ckNow{font-size:max(44px,min(10vw,15vh))} /* 타이머가 있으면 남은 시간을 더 크게 */
 #ckNow small{font-size:.38em;font-weight:600;color:var(--ck-dim);margin-left:.15em}
 #ckNow small.ap{margin:0 .25em 0 0}
-#ckTimer{width:min(1100px,92vw);display:flex;flex-direction:column;align-items:center;gap:1.4vh;padding:2.4vh 3vw;border-radius:24px;
-  background:var(--ck-panel);border:1px solid var(--ck-line)}
+/* 남은 시간: 타임 타이머형 아날로그 눈금판 + 숫자 */
+#ckTimer{display:flex;align-items:center;justify-content:center;gap:max(28px,5vw);padding:1.5vh 3vw;border-radius:28px}
 #ckTimer[hidden]{display:none}
+#ckDial{width:min(54vh,44vw);height:min(54vh,44vw);flex:none;overflow:visible}
+#ckDial .face{fill:var(--ck-panel);stroke:var(--ck-line);stroke-width:1.5}
+#ckDial .tk{stroke:var(--ck-dim);stroke-width:2;stroke-linecap:round;opacity:.6}
+#ckDial .tk.b{stroke-width:3.6;opacity:.9}
+#ckDial text{fill:var(--ck-dim);font-size:22px;font-weight:600;text-anchor:middle;dominant-baseline:central;font-family:inherit}
+#ckDial .hub{fill:var(--ck-bg);stroke:var(--ck-line);stroke-width:3}
+#ckWedge{fill:var(--ck-accent);transition:fill .3s}
+#ckDial #ckOver{fill:var(--ck-on-accent);font-size:20px!important;font-weight:700!important}
+#ckSide{display:flex;flex-direction:column;align-items:flex-start;gap:.6vh;min-width:0}
 #ckLabel{font-size:clamp(16px,2vw,26px);color:var(--ck-dim);font-weight:500}
-#ckRemain{font-size:max(48px,min(12vw,19vh));font-weight:700;line-height:1}
-#ckBarWrap{width:100%;height:clamp(10px,1.4vh,18px);background:var(--ck-track);border-radius:999px;overflow:hidden}
-#ckBar{height:100%;width:0;background:var(--ck-accent);border-radius:999px;transition:width .5s linear,background .3s}
-#ckRange{display:flex;justify-content:space-between;width:100%;font-size:clamp(14px,1.6vw,22px);color:var(--ck-dim)}
-#ckTimer.warn #ckRemain,#ckTimer.warn #ckLabel{color:var(--ck-warn)}#ckTimer.warn #ckBar{background:var(--ck-warn)}
-#ckTimer.danger #ckRemain,#ckTimer.danger #ckLabel{color:var(--ck-danger)}#ckTimer.danger #ckBar{background:var(--ck-danger)}
+#ckRemain{font-size:max(56px,min(11vw,19vh));font-weight:700;line-height:1;letter-spacing:-.02em}
+#ckNowLab{font-size:clamp(15px,1.7vw,22px);color:var(--ck-dim);margin-top:2.6vh}
+#ckNow2{font-size:max(34px,min(5.2vw,8.5vh));font-weight:700;line-height:1}
+#ckNow2 small{font-size:.42em;font-weight:600;color:var(--ck-dim);margin-left:.15em}
+#ckNow2 small.ap{margin:0 .25em 0 0}
+#ckRange{font-size:clamp(14px,1.6vw,22px);color:var(--ck-dim);margin-top:1.2vh}
+#clockView.timing #ckNow{display:none} /* 타이머가 있으면 지금 시각은 오른쪽에 작게 */
+#ckTimer.pre #ckWedge,#ckTimer.paused #ckWedge{fill:var(--ck-dim)}
+#ckTimer.warn #ckRemain,#ckTimer.warn #ckLabel{color:var(--ck-warn)}#ckTimer.warn #ckWedge{fill:var(--ck-warn)}
+#ckTimer.danger #ckRemain,#ckTimer.danger #ckLabel{color:var(--ck-danger)}#ckTimer.danger #ckWedge{fill:var(--ck-danger)}
+@media (orientation:portrait){#ckTimer{flex-direction:column;gap:3vh}#ckDial{width:min(70vw,44vh);height:min(70vw,44vh)}#ckSide{align-items:center}}
 #ckTimer.ended #ckRemain{color:var(--ck-danger)}
 #ckTimer.flash{animation:ckflash 1s steps(2) infinite}
 @keyframes ckflash{50%{background:rgba(248,113,113,.28)}}
@@ -581,10 +595,14 @@ body.ck-idle #clockView{cursor:none}
   <div id="ckDate"></div>
   <div id="ckNow" aria-live="off"></div>
   <div id="ckTimer" hidden>
-    <div id="ckLabel">남은 시간</div>
-    <div id="ckRemain">00:00</div>
-    <div id="ckBarWrap"><div id="ckBar"></div></div>
-    <div id="ckRange"><span id="ckFrom"></span><span id="ckTo"></span></div>
+    <svg id="ckDial" viewBox="0 0 440 440" aria-hidden="true"></svg>
+    <div id="ckSide">
+      <div id="ckLabel">남은 시간</div>
+      <div id="ckRemain">00:00</div>
+      <div id="ckNowLab">지금</div>
+      <div id="ckNow2"></div>
+      <div id="ckRange"></div>
+    </div>
   </div>
   <div id="ckNotice" contenteditable="true" spellcheck="false" aria-label="안내 문구"></div>
   <div id="ckCtl">
@@ -2359,11 +2377,28 @@ function fmtDur(ms){
 }
 const hm=d=>pad(d.getHours())+':'+pad(d.getMinutes());
 let lastZone='',flashUntil=0;
+/* 눈금판: 0이 맨 위, 시계 반대 방향으로 5·10·15… 남은 분만큼 부채꼴(60분 한 바퀴) */
+const DC=220,DP=(r,deg)=>[DC+r*Math.sin(deg*Math.PI/180),DC-r*Math.cos(deg*Math.PI/180)];
+(function buildDial(){
+  let h='<circle class="face" cx="220" cy="220" r="216"/><path id="ckWedge" d=""/>';
+  for(let i=0;i<60;i++){const b=i%5===0,[x1,y1]=DP(176,i*6),[x2,y2]=DP(b?160:168,i*6);h+=`<line class="tk${b?' b':''}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`;}
+  for(let m=0;m<60;m+=5){const [x,y]=DP(197,-m*6);h+=`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}">${m}</text>`;}
+  h+='<circle class="hub" cx="220" cy="220" r="20"/><text id="ckOver" x="220" y="300"></text>';
+  $c('ckDial').innerHTML=h;
+})();
+function setWedge(min){
+  const w=$c('ckWedge'),R=164;min=Math.max(0,min);
+  if(min>=60){w.setAttribute('d',`M${DC} ${DC-R}A${R} ${R} 0 1 1 ${DC-0.01} ${DC-R}Z`);}
+  else if(min<=0){w.setAttribute('d','');}
+  else{const a=360-min*6,[x,y]=DP(R,a);w.setAttribute('d',`M${DC} ${DC}L${x.toFixed(2)} ${y.toFixed(2)}A${R} ${R} 0 ${min>30?1:0} 1 ${DC} ${DC-R}Z`);}
+  $c('ckOver').textContent=min>=60?'+'+Math.floor(min/60)+'시간':''; // 60분이 넘으면 꽉 찬 원 + 시간 표시
+}
 function tick(){
   const now=new Date();
   $c('ckDate').textContent=`${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 (${WD[now.getDay()]})`;
   const h=now.getHours(),ap=h<12?'오전':'오후',h12=h%12||12;
   $c('ckNow').innerHTML=`<small class="ap">${ap}</small>${h12}:${pad(now.getMinutes())}<small>:${pad(now.getSeconds())}</small>`; // 오후 7:17:10
+  $c('ckNow2').innerHTML=$c('ckNow').innerHTML;
   const box=$c('ckTimer'),r=st.run;
   box.hidden=!r;view.classList.toggle('timing',!!r);$c('ckStop').hidden=!r;$c('ckPause').hidden=!(r&&st.mode==='count');
   if(!r){box.className='';lastZone='';return;}
@@ -2383,10 +2418,11 @@ function tick(){
   }
   $c('ckLabel').textContent=label;
   $c('ckRemain').textContent=zone==='end'?'00:00':fmtDur(remain);
-  $c('ckBar').style.width=Math.max(0,Math.min(1,prog))*100+'%';
-  $c('ckFrom').textContent=(st.mode==='until'?'시작 ':'')+hm(new Date(r.startAt));
-  $c('ckTo').textContent='종료 '+hm(new Date(r.endAt));
-  box.className=(zone==='end'?'ended'+(t<flashUntil?' flash':''):zone==='danger'?'danger':zone==='warn'?'warn':'');
+  // 시작 전에는 시험 길이를 회색으로, 그 뒤로는 남은 시간만큼 부채꼴
+  setWedge(zone==='end'?0:zone==='pre'?(r.endAt-r.startAt)/60e3:remain/60e3);
+  const total=Math.round((r.endAt-r.startAt)/60e3);
+  $c('ckRange').textContent=`${hm(new Date(r.startAt))} ~ ${hm(new Date(r.endAt))} (${total>=60?Math.floor(total/60)+'시간 '+(total%60?total%60+'분':''):total+'분'})`.replace(' )',')');
+  box.className=(zone==='end'?'ended'+(t<flashUntil?' flash':''):zone==='danger'?'danger':zone==='warn'?'warn':zone==='pre'?'pre':r.paused?'paused':'');
 }
 setInterval(()=>{if(document.body.classList.contains('clock-mode'))tick();},250);
 
