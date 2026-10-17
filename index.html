@@ -37,9 +37,16 @@ button{font-family:inherit}
 #laser{pointer-events:none} /* 레이저 층: 저장·되돌리기와 상관없이 잠깐 보였다 사라짐 */
 #ink.texting{cursor:text}
 /* 글상자 입력칸: 쓰는 동안만 보이고, 다 쓰면 캔버스에 글씨로 들어감 */
-#textEdit{position:absolute;z-index:5;margin:0;padding:0;border:none;resize:none;overflow:hidden;white-space:pre;
-  background:rgba(255,255,255,.55);outline:1.5px dashed var(--accent);outline-offset:6px;border-radius:2px;
-  font-family:'Noto Sans KR','Malgun Gothic',sans-serif;line-height:1.3;min-width:1em;caret-color:var(--accent)}
+#textEdit{position:absolute;z-index:5;margin:0;padding:0;border:none;white-space:pre;outline:none;
+  background:rgba(255,255,255,.55);box-shadow:0 0 0 6px rgba(255,255,255,.55);border-radius:2px;
+  font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-weight:400;line-height:1.3;min-width:.6em;caret-color:var(--accent)}
+#textEdit b,#textEdit strong{font-weight:700}
+/* 쓰는 중인 글상자의 테두리(점선)와 이동 손잡이 */
+#textFrame{position:absolute;z-index:4;border:1.5px dashed var(--accent);border-radius:4px;pointer-events:none}
+#textHandle{position:absolute;z-index:6;width:30px;height:30px;border:none;border-radius:8px;background:var(--accent);color:#fff;
+  display:grid;place-items:center;cursor:move;touch-action:none;box-shadow:0 2px 8px rgba(15,23,42,.25)}
+#textHandle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+#ink.textmove{cursor:move}
 .grp{display:flex;align-items:center;gap:2px;flex:none}
 #fsize{width:64px;height:34px;border:1px solid var(--line);border-radius:8px;text-align:center;font:inherit;font-size:14px;font-weight:700;color:var(--ink);outline:none}
 #fsize:focus{border-color:var(--accent)}
@@ -178,7 +185,7 @@ label.ib input{display:none}
 </head>
 <body>
 
-<div id="wrap"><div id="stage"><canvas id="bg"></canvas><canvas id="hl"></canvas><canvas id="ink"></canvas><canvas id="laser"></canvas><div id="links"></div><textarea id="textEdit" hidden spellcheck="false" aria-label="글상자 내용"></textarea></div></div>
+<div id="wrap"><div id="stage"><canvas id="bg"></canvas><canvas id="hl"></canvas><canvas id="ink"></canvas><canvas id="laser"></canvas><div id="links"></div><div id="textFrame" hidden></div><div id="textEdit" hidden contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="글상자 내용"></div><button id="textHandle" type="button" hidden title="끌어서 글상자 옮기기" aria-label="글상자 옮기기"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="m9 6 3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></button></div></div>
 
 <!-- 상단: 확대·축소 + 페이지 -->
 <div id="top" class="float">
@@ -218,7 +225,7 @@ label.ib input{display:none}
   </div>
   <div class="grp" id="textCtl" hidden>
   <label class="ctl"><span>글씨 크기</span><input id="fsize" type="number" min="8" max="300" value="32" inputmode="numeric" aria-label="글씨 크기"></label>
-  <button class="ib" id="boldBtn" type="button" title="굵게 ( Ctrl+B )" aria-label="굵게" aria-pressed="false"><b>B</b></button>
+  <button class="ib" id="boldBtn" type="button" title="블록한 글씨를 굵게 ( Ctrl+B )" aria-label="굵게" aria-pressed="false"><b>B</b></button>
   </div>
   <div class="sep"></div>
   <button class="ib" id="undo" title="되돌리기 ( Ctrl+Z )" aria-label="되돌리기"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
@@ -708,7 +715,7 @@ $('save').onclick=()=>{
 
 /* ---------- 키보드 (발표용 리모컨의 PageUp/PageDown도 인식) ---------- */
 document.addEventListener('keydown',e=>{
-  if(e.target.tagName==='TEXTAREA')return; // 글상자에 쓰는 중엔 단축키 끔
+  if(e.target.tagName==='TEXTAREA'||e.target.isContentEditable)return; // 글상자에 쓰는 중엔 단축키 끔
   if(e.ctrlKey&&e.key==='z'){$('undo').click();e.preventDefault();return;}
   if(e.ctrlKey)return;
   if(e.target.tagName==='INPUT'&&e.target.type==='range'&&e.key.startsWith('Arrow'))return; // 슬라이더 조작 중엔 넘기지 않음
@@ -759,12 +766,13 @@ function hasInk(){return strokes.some(pg=>pg.length);}
 function serialize(){
   return {v:1,app:'pen',key:docKey,name:docName,pageCount,updated:docUpdated,
     pages:strokes.map(pg=>pg.map(s=>s.type==='text'
-      ?{t:'x',x:r4(s.x),y:r4(s.y),tx:s.text,fs:s.fs,b:s.b?1:0,c:s.color}
+      ?{t:'x',x:r4(s.x),y:r4(s.y),r:s.runs.map(r=>[r.t,r.b?1:0]),fs:s.fs,c:s.color}
       :{c:s.color,s:r2(s.size),a:s.angle,m:s.marker?1:0,p:s.pts.map(q=>[r4(q.x),r4(q.y),r2(q.p)])}))};
 }
 function applyData(d){
   const pages=(d.pages||[]).map(pg=>pg.map(s=>s.t==='x'
-    ?{type:'text',x:s.x,y:s.y,text:s.tx||'',fs:s.fs||32,b:!!s.b,color:s.c}
+    ?{type:'text',x:s.x,y:s.y,fs:s.fs||32,color:s.c,
+      runs:s.r?s.r.map(r=>({t:r[0],b:!!r[1]})):[{t:s.tx||'',b:!!s.b}]} // 예전 형식(전체 굵기)도 읽음
     :{color:s.c,size:s.s,angle:s.a,marker:!!s.m,pts:s.p.map(q=>({x:q[0],y:q[1],p:q[2]}))}));
   if(pdf){ // PDF 쪽수에 맞춤
     strokes=Array.from({length:pageCount},(_,i)=>pages[i]||[]);
@@ -1013,26 +1021,46 @@ $('pgInput').addEventListener('keydown',e=>{
 $('pgInput').addEventListener('blur',()=>closePgEdit(true)); // 다른 곳을 눌러도 그 번호로 이동
 
 /* ---------- 글상자 ---------- */
-// 글상자 도구로 누른 자리에 글씨를 넣음. 크기는 숫자(쪽 너비 1000 기준), 굵게/보통, 색은 색 동그라미로
-// 이미 있는 글씨: 누르면 고치기, 끌면 옮기기. 지우개로 문지르면 지워짐
+// 글상자 도구로 누른 자리에 글씨를 넣음
+// - 크기: 숫자(쪽 너비 1000 기준), 색: 색 동그라미 → 글상자 전체에 적용
+// - 굵게: 블록(선택)한 글씨에만 적용. 선택 없이 누르면 이어서 쓰는 글씨부터 굵게
+// - 쓰는 중: 왼쪽 위 파란 손잡이를 끌어서 옮김 / 다 쓴 글씨: 끌어서 옮김, 누르면 고침
+// 글상자 내용은 [{t:'글씨', b:굵게여부}, ...] 조각(runs)으로 저장
 const TEXT_FONT='"Noto Sans KR","Malgun Gothic",sans-serif',TEXT_LH=1.3;
 let editing=null; // {item,isNew,pg}
-const ta=$('textEdit');
-function fontOf(s){return (s.b?'700 ':'400 ')+(s.fs*W/1000)+'px '+TEXT_FONT;}
+const ta=$('textEdit'),tframe=$('textFrame'),thandle=$('textHandle');
+function fontOf(fs,b){return (b?'700 ':'400 ')+(fs*W/1000)+'px '+TEXT_FONT;}
+function runsText(runs){return runs.map(r=>r.t).join('');}
+function linesOf(runs){ // 조각들을 줄 단위로 나눔
+  const lines=[[]];
+  for(const r of runs){
+    r.t.split('\n').forEach((pt,i)=>{if(i>0)lines.push([]);if(pt)lines[lines.length-1].push({t:pt,b:r.b});});
+  }
+  return lines;
+}
+function measureLines(s,lines){
+  return lines.map(ln=>ln.reduce((w,seg)=>{ctx.font=fontOf(s.fs,seg.b);return w+ctx.measureText(seg.t).width;},0));
+}
 function drawText(s){
   if(s._editing)return;
   const fpx=s.fs*W/1000,lh=fpx*TEXT_LH,off=fpx*(TEXT_LH-1)/2; // 입력칸과 같은 자리에 오도록 줄 간격만큼 내림
-  ctx.font=fontOf(s);ctx.fillStyle=s.color;ctx.textBaseline='top';
-  const lines=s.text.split('\n');let w=0;
-  lines.forEach((ln,i)=>{ctx.fillText(ln,s.x*W,s.y*W+off+i*lh);w=Math.max(w,ctx.measureText(ln).width);});
-  s._bb={x0:s.x,y0:s.y,x1:s.x+Math.max(w,fpx*0.5)/W,y1:s.y+lines.length*lh/W};
+  const lines=linesOf(s.runs);
+  ctx.fillStyle=s.color;ctx.textBaseline='top';
+  let maxW=0;
+  lines.forEach((ln,i)=>{
+    let x=s.x*W;
+    for(const seg of ln){ctx.font=fontOf(s.fs,seg.b);ctx.fillText(seg.t,x,s.y*W+off+i*lh);x+=ctx.measureText(seg.t).width;}
+    maxW=Math.max(maxW,x-s.x*W);
+  });
+  s._bb={x0:s.x,y0:s.y,x1:s.x+Math.max(maxW,fpx*0.5)/W,y1:s.y+lines.length*lh/W};
 }
 function textAt(p){
-  const list=strokes[page];
+  const list=strokes[page],m=0.004;
   for(let i=list.length-1;i>=0;i--){const s=list[i];
-    if(s.type==='text'&&s._bb&&p.x>=s._bb.x0&&p.x<=s._bb.x1&&p.y>=s._bb.y0&&p.y<=s._bb.y1)return s;}
+    if(s.type==='text'&&s._bb&&p.x>=s._bb.x0-m&&p.x<=s._bb.x1+m&&p.y>=s._bb.y0-m&&p.y<=s._bb.y1+m)return s;}
   return null;
 }
+/* 다 쓴 글씨: 끌면 옮기고, 누르면 고침 */
 function textDown(p){
   if(editing){commitText();cur=null;return;} // 다른 곳을 누르면 쓰던 글상자 마무리
   const hit=textAt(p);
@@ -1048,47 +1076,82 @@ function textUp(c){
   if(c.hit){if(c.moved)markDirty();else editText(c.hit);}
   else newText(c.start);
 }
+ink.addEventListener('pointermove',e=>{ // 글씨 위에 올리면 '옮기기' 모양 커서
+  if(tool!=='text'||cur||e.pointerType==='touch')return;
+  ink.classList.toggle('textmove',!!textAt(pos(e)));
+});
 function setTextCtl(fs,b){
   textSize=fs;textBold=b;$('fsize').value=fs;
   $('boldBtn').setAttribute('aria-pressed',b?'true':'false');
 }
 function newText(p){
-  const item={type:'text',x:p.x,y:p.y-textSize*TEXT_LH/2/1000,text:'',fs:textSize,b:textBold,color:textColor};
+  const item={type:'text',x:p.x,y:p.y-textSize*TEXT_LH/2/1000,fs:textSize,color:textColor,runs:[]};
   openEditor(item,true);
 }
 function editText(item){
-  textColor=item.color;setTextCtl(item.fs,item.b);syncSwatches();
+  textColor=item.color;setTextCtl(item.fs,textBold);syncSwatches();
   openEditor(item,false);
+}
+/* 입력칸 ↔ 조각(runs) */
+function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function runsToHtml(runs){return runs.map(r=>r.b?'<b>'+esc(r.t)+'</b>':esc(r.t)).join('');}
+function htmlToRuns(root){
+  const out=[];
+  const push=(t,b)=>{if(!t)return;const last=out[out.length-1];if(last&&last.b===b)last.t+=t;else out.push({t,b});};
+  const isBold=el=>{const w=getComputedStyle(el).fontWeight;return w==='bold'||parseInt(w,10)>=600;};
+  (function walk(node,bold){
+    for(const ch of node.childNodes){
+      if(ch.nodeType===3){push(ch.nodeValue.replace(/ /g,' '),bold);continue;}
+      if(ch.nodeType!==1)continue;
+      if(ch.tagName==='BR'){push('\n',bold);continue;}
+      const block=/^(DIV|P)$/.test(ch.tagName);
+      if(block&&out.length&&!out[out.length-1].t.endsWith('\n'))push('\n',bold); // 줄바꿈으로 생긴 덩어리
+      walk(ch,isBold(ch));
+    }
+  })(root,false);
+  return out;
 }
 function openEditor(item,isNew){
   editing={item,isNew,pg:page};
   item._editing=true;if(!isNew)redraw();
-  ta.value=item.text;ta.hidden=false;styleEditor();
-  const focusEnd=()=>{if(editing&&editing.item===item&&document.activeElement!==ta){ta.focus();const n=ta.value.length;ta.setSelectionRange(n,n);}};
+  ta.innerHTML=runsToHtml(item.runs);
+  ta.hidden=false;tframe.hidden=false;thandle.hidden=false;
+  styleEditor();
+  const focusEnd=()=>{
+    if(!editing||editing.item!==item||document.activeElement===ta)return;
+    ta.focus();
+    const sel=getSelection(),rg=document.createRange();rg.selectNodeContents(ta);rg.collapse(false);
+    sel.removeAllRanges();sel.addRange(rg);
+    if(textBold&&!document.queryCommandState('bold'))document.execCommand('bold'); // 새 글상자를 굵게로 시작
+  };
   focusEnd();setTimeout(focusEnd,0); // 바로 입력할 수 있게 커서를 넣어 둠
 }
 function styleEditor(){
   if(!editing)return;
-  const s=editing.item,fpx=s.fs*W/1000;
-  ta.style.left=s.x*W+'px';ta.style.top=s.y*W+'px';
-  ta.style.fontSize=fpx+'px';ta.style.fontWeight=s.b?'700':'400';ta.style.color=s.color;
-  ctx.font=fontOf(s);
-  const w=Math.max(...ta.value.split('\n').map(l=>ctx.measureText(l).width),fpx*0.6);
-  ta.style.width=Math.ceil(w+fpx*0.6)+'px';
-  ta.style.height=Math.ceil(Math.max(1,ta.value.split('\n').length)*fpx*TEXT_LH)+'px';
+  const s=editing.item,fpx=s.fs*W/1000,X=s.x*W,Y=s.y*W;
+  ta.style.left=X+'px';ta.style.top=Y+'px';
+  ta.style.fontSize=fpx+'px';ta.style.color=s.color;ta.style.lineHeight=String(TEXT_LH);
+  ta.style.minHeight=fpx*TEXT_LH+'px';
+  const w=Math.max(ta.offsetWidth,fpx*0.6),h=Math.max(ta.offsetHeight,fpx*TEXT_LH);
+  tframe.style.left=X-7+'px';tframe.style.top=Y-7+'px';tframe.style.width=w+14+'px';tframe.style.height=h+14+'px';
+  thandle.style.left=X-7-34+'px';thandle.style.top=Y-7+'px';
 }
-function applyTextStyle(){ // 크기·굵기·색을 바꾸면 지금 쓰는 글상자에도 바로 적용
+function applyTextStyle(){ // 크기·색을 바꾸면 지금 쓰는 글상자 전체에 바로 적용
   if(!editing)return;
-  const s=editing.item;s.fs=textSize;s.b=textBold;s.color=textColor;
+  const s=editing.item;s.fs=textSize;s.color=textColor;
   styleEditor();ta.focus();
 }
 function commitText(){
   if(!editing)return;
-  const {item,isNew,pg}=editing;editing=null;
-  ta.hidden=true;ta.blur();item._editing=false;
-  item.text=ta.value.replace(/\s+$/,'');
+  const {item,isNew,pg}=editing;
+  item.runs=htmlToRuns(ta);
+  // 끝의 빈 줄·공백 정리
+  while(item.runs.length){const l=item.runs[item.runs.length-1];l.t=l.t.replace(/\s+$/,'');if(l.t)break;item.runs.pop();}
+  editing=null;
+  ta.hidden=true;tframe.hidden=true;thandle.hidden=true;ta.blur();ta.innerHTML='';item._editing=false;
+  $('boldBtn').setAttribute('aria-pressed',textBold?'true':'false'); // 단추 표시를 '다음 글상자' 기준으로 되돌림
   const list=strokes[pg];
-  if(!item.text){ // 빈 글상자는 없앰
+  if(!runsText(item.runs).trim()){ // 빈 글상자는 없앰
     if(!isNew){const i=list.indexOf(item);if(i>=0)list.splice(i,1);markDirty();}
   }else{
     if(isNew)list.push(item);
@@ -1098,18 +1161,53 @@ function commitText(){
 }
 ta.addEventListener('input',()=>styleEditor());
 ta.addEventListener('keydown',e=>{
-  if(e.key==='Escape'||(e.key==='Enter'&&(e.ctrlKey||e.metaKey))){e.preventDefault();commitText();}
-  else if((e.ctrlKey||e.metaKey)&&(e.key==='b'||e.key==='B')){e.preventDefault();setTextCtl(textSize,!textBold);applyTextStyle();}
+  if(e.key==='Escape'||(e.key==='Enter'&&(e.ctrlKey||e.metaKey))){e.preventDefault();commitText();return;}
+  if(e.key==='Enter'){e.preventDefault();document.execCommand('insertLineBreak');styleEditor();return;} // 줄바꿈
+  if((e.ctrlKey||e.metaKey)&&(e.key==='b'||e.key==='B')){e.preventDefault();toggleBold();}
+});
+ta.addEventListener('paste',e=>{ // 붙여넣기는 글씨만
+  e.preventDefault();
+  const t=(e.clipboardData||window.clipboardData).getData('text/plain');
+  document.execCommand('insertText',false,t);
 });
 ta.addEventListener('pointerdown',e=>e.stopPropagation());
+document.addEventListener('selectionchange',()=>{ // 커서 자리의 굵기를 B 단추에 표시
+  if(!editing||document.activeElement!==ta)return;
+  $('boldBtn').setAttribute('aria-pressed',document.queryCommandState('bold')?'true':'false');
+});
+function toggleBold(){
+  if(editing){
+    ta.focus();
+    document.execCommand('styleWithCSS',false,false);
+    document.execCommand('bold'); // 블록한 글씨만 굵게/보통 (선택이 없으면 이어서 쓰는 글씨부터)
+    $('boldBtn').setAttribute('aria-pressed',document.queryCommandState('bold')?'true':'false');
+    styleEditor();
+  }else{
+    setTextCtl(textSize,!textBold); // 쓰는 중이 아니면 다음 글상자를 굵게 시작할지 정함
+  }
+}
+/* 쓰는 중인 글상자: 파란 손잡이를 끌어서 옮기기 */
+let hdrag=null;
+thandle.addEventListener('pointerdown',e=>{
+  if(!editing)return;
+  e.preventDefault();e.stopPropagation();thandle.setPointerCapture(e.pointerId);
+  hdrag={x:e.clientX,y:e.clientY,ox:editing.item.x,oy:editing.item.y};
+});
+thandle.addEventListener('pointermove',e=>{
+  if(!hdrag||!editing)return;
+  editing.item.x=hdrag.ox+(e.clientX-hdrag.x)/W;editing.item.y=hdrag.oy+(e.clientY-hdrag.y)/W;styleEditor();
+});
+const endHdrag=()=>{if(!hdrag)return;hdrag=null;if(editing)ta.focus();};
+thandle.addEventListener('pointerup',endHdrag);
+thandle.addEventListener('pointercancel',endHdrag);
 $('fsize').addEventListener('input',()=>{
   const v=parseInt($('fsize').value,10);
   if(!isNaN(v)&&v>=4){textSize=Math.min(300,v);if(editing){editing.item.fs=textSize;styleEditor();}}
 });
 $('fsize').addEventListener('change',()=>{setTextCtl(clamp(parseInt($('fsize').value,10)||32,8,300),textBold);applyTextStyle();});
 $('fsize').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('fsize').dispatchEvent(new Event('change'));}});
-$('boldBtn').addEventListener('pointerdown',e=>e.preventDefault()); // 누를 때 글상자 커서를 잃지 않게
-$('boldBtn').onclick=()=>{setTextCtl(textSize,!textBold);applyTextStyle();};
+$('boldBtn').addEventListener('pointerdown',e=>e.preventDefault()); // 누를 때 블록 선택이 풀리지 않게
+$('boldBtn').onclick=toggleBold;
 document.querySelectorAll('.sw').forEach(el=>el.addEventListener('pointerdown',e=>{if(editing&&!el.querySelector('input'))e.preventDefault();}));
 if(document.fonts&&document.fonts.load){ // 캔버스 글씨용 글꼴을 미리 불러와서 다시 그림
   Promise.all([document.fonts.load('400 20px "Noto Sans KR"'),document.fonts.load('700 20px "Noto Sans KR"')]).then(()=>redraw()).catch(()=>{});
