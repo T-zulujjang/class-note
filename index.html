@@ -237,6 +237,94 @@ label.ib input{display:none}
 .dmsg{padding:28px 16px;text-align:center;color:var(--muted);font-size:14px;line-height:1.6}
 .dfoot{padding:10px 20px 14px;border-top:1px solid var(--sep);font-size:12px;color:var(--muted);line-height:1.5}
 
+
+/* ================= 탭: 판서 / 시계 ================= */
+#tabs{position:fixed;top:16px;left:16px;z-index:60;display:flex;gap:2px;padding:4px;background:var(--panel);border:1px solid var(--line);
+  border-radius:999px;box-shadow:var(--shadow);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+#tabs button{height:36px;display:flex;align-items:center;gap:6px;padding:0 14px;border:none;border-radius:999px;background:transparent;
+  font:inherit;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer}
+#tabs button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#tabs button.on{background:var(--accent);color:#fff;font-weight:700}
+@media (max-width:1180px){#tabs button span{display:none}#tabs button{padding:0 11px}}
+body.clock-mode #wrap,body.clock-mode #bar,body.clock-mode #top,body.clock-mode .side,body.clock-mode #acct,
+body.clock-mode #acctMenu,body.clock-mode #notePop,body.clock-mode #penMenu,body.clock-mode #bgMenu{display:none!important}
+#clockView{display:none}
+body.clock-mode #clockView{display:flex}
+body.clock-mode{background:var(--ck-bg)}
+body.clock-mode #tabs{background:var(--ck-panel);border-color:var(--ck-line)}
+body.clock-mode #tabs button{color:var(--ck-dim)}
+body.clock-mode #tabs button.on{background:var(--ck-accent);color:var(--ck-on-accent)}
+
+/* ================= 시계 · 타이머 ================= */
+#clockView{--ck-bg:#0E1116;--ck-panel:rgba(255,255,255,.06);--ck-line:rgba(255,255,255,.12);--ck-fg:#F3F4F6;--ck-dim:#9CA3AF;
+  --ck-accent:#60A5FA;--ck-on-accent:#0B1220;--ck-warn:#FBBF24;--ck-danger:#F87171;--ck-track:rgba(255,255,255,.12);
+  position:fixed;inset:0;z-index:50;flex-direction:column;align-items:center;justify-content:center;gap:2vh;padding:76px 24px 96px;
+  background:var(--ck-bg);color:var(--ck-fg);font-variant-numeric:tabular-nums;-webkit-user-select:none;user-select:none}
+#clockView.light{--ck-bg:#FFFFFF;--ck-panel:rgba(15,23,42,.04);--ck-line:rgba(15,23,42,.12);--ck-fg:#111827;--ck-dim:#6B7280;
+  --ck-accent:#2457D6;--ck-on-accent:#fff;--ck-warn:#B45309;--ck-danger:#B91C1C;--ck-track:rgba(15,23,42,.10)}
+body.clock-mode.ck-light{--ck-bg:#fff;--ck-panel:rgba(15,23,42,.04);--ck-line:rgba(15,23,42,.12);--ck-dim:#6B7280;--ck-accent:#2457D6;--ck-on-accent:#fff}
+body.clock-mode:not(.ck-light){--ck-bg:#0E1116;--ck-panel:rgba(255,255,255,.08);--ck-line:rgba(255,255,255,.14);--ck-dim:#9CA3AF;--ck-accent:#60A5FA;--ck-on-accent:#0B1220}
+#ckTitle{font-size:clamp(22px,3.6vw,48px);font-weight:700;letter-spacing:-.01em;text-align:center;outline:none;min-width:2em;
+  padding:2px 12px;border-radius:10px;cursor:text}
+#ckTitle:empty::before{content:'제목 (예: 2교시 물리학Ⅰ)';color:var(--ck-dim);font-weight:500}
+#ckTitle:focus{background:var(--ck-panel)}
+#ckDate{font-size:clamp(16px,2vw,26px);color:var(--ck-dim)}
+#ckNow{font-size:max(56px,min(16vw,26vh));font-weight:700;line-height:1;letter-spacing:-.02em}
+#clockView.timing #ckNow{font-size:max(44px,min(10vw,15vh))} /* 타이머가 있으면 남은 시간을 더 크게 */
+#ckNow small{font-size:.38em;font-weight:600;color:var(--ck-dim);margin-left:.15em}
+#ckNow small.ap{margin:0 .25em 0 0}
+#ckTimer{width:min(1100px,92vw);display:flex;flex-direction:column;align-items:center;gap:1.4vh;padding:2.4vh 3vw;border-radius:24px;
+  background:var(--ck-panel);border:1px solid var(--ck-line)}
+#ckTimer[hidden]{display:none}
+#ckLabel{font-size:clamp(16px,2vw,26px);color:var(--ck-dim);font-weight:500}
+#ckRemain{font-size:max(48px,min(12vw,19vh));font-weight:700;line-height:1}
+#ckBarWrap{width:100%;height:clamp(10px,1.4vh,18px);background:var(--ck-track);border-radius:999px;overflow:hidden}
+#ckBar{height:100%;width:0;background:var(--ck-accent);border-radius:999px;transition:width .5s linear,background .3s}
+#ckRange{display:flex;justify-content:space-between;width:100%;font-size:clamp(14px,1.6vw,22px);color:var(--ck-dim)}
+#ckTimer.warn #ckRemain,#ckTimer.warn #ckLabel{color:var(--ck-warn)}#ckTimer.warn #ckBar{background:var(--ck-warn)}
+#ckTimer.danger #ckRemain,#ckTimer.danger #ckLabel{color:var(--ck-danger)}#ckTimer.danger #ckBar{background:var(--ck-danger)}
+#ckTimer.ended #ckRemain{color:var(--ck-danger)}
+#ckTimer.flash{animation:ckflash 1s steps(2) infinite}
+@keyframes ckflash{50%{background:rgba(248,113,113,.28)}}
+#ckNotice{font-size:clamp(16px,2.2vw,30px);text-align:center;max-width:92vw;outline:none;padding:2px 12px;border-radius:10px;white-space:pre-wrap;cursor:text}
+#ckNotice:empty::before{content:'안내 문구 (예: 휴대폰은 전원을 끄고 가방에 넣으세요)';color:var(--ck-dim);font-size:.8em}
+#ckNotice:focus{background:var(--ck-panel)}
+/* 아래 조작 막대: 마우스를 가만히 두면 사라짐 */
+#ckCtl{position:fixed;bottom:18px;left:12px;right:12px;margin:0 auto;width:fit-content;display:flex;align-items:center;gap:4px;padding:6px;flex-wrap:wrap;justify-content:center;
+  background:var(--ck-panel);border:1px solid var(--ck-line);border-radius:16px;transition:opacity .4s;max-width:calc(100vw - 24px);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+body.ck-idle #ckCtl,body.ck-idle #tabs{opacity:0;pointer-events:none}
+body.ck-idle #clockView{cursor:none}
+#tabs{transition:opacity .4s}
+@media (max-width:900px){body:not(.clock-mode) #tabs{top:auto;bottom:136px;left:12px}} /* 좁은 화면에선 위쪽 단추 줄과 겹치지 않게 */
+.ckb{height:44px;display:flex;align-items:center;gap:6px;padding:0 14px;border:none;border-radius:10px;background:transparent;color:var(--ck-fg);
+  font:inherit;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap}
+.ckb:hover{background:var(--ck-panel)}
+.ckb.pri{background:var(--ck-accent);color:var(--ck-on-accent);font-weight:700}
+.ckb svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.cksep{width:1px;height:26px;background:var(--ck-line);margin:0 4px}
+/* 설정 창 */
+#ckSet{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px}
+#ckSet[hidden]{display:none}
+#ckSet .box{width:min(460px,100%);max-height:92vh;overflow:auto;background:#fff;color:#111827;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px;
+  box-shadow:0 24px 64px rgba(0,0,0,.35);font-variant-numeric:tabular-nums}
+#ckSet h3{margin:0;font-size:18px}
+#ckSet .seg{display:flex;gap:4px;padding:3px;background:#F1F3F6;border-radius:10px}
+#ckSet .seg button{flex:1;height:36px;border:none;border-radius:8px;background:transparent;font:inherit;font-size:14px;color:#6B7280;cursor:pointer}
+#ckSet .seg button.on{background:#fff;color:#111827;font-weight:700;box-shadow:0 1px 3px rgba(15,23,42,.12)}
+#ckSet label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#6B7280}
+#ckSet input[type=time],#ckSet input[type=number]{height:44px;padding:0 12px;border:1px solid #DDE1E8;border-radius:10px;font:inherit;font-size:18px;color:#111827}
+#ckSet .row{display:flex;gap:10px}#ckSet .row>*{flex:1}
+#ckSet .quick{display:flex;flex-wrap:wrap;gap:6px}
+#ckSet .quick button{height:36px;padding:0 12px;border:1px solid #DDE1E8;border-radius:999px;background:#fff;font:inherit;font-size:14px;cursor:pointer}
+#ckSet .quick button:hover{border-color:#2457D6;color:#2457D6}
+#ckSet .chk{display:flex;align-items:center;gap:8px;font-size:14px;color:#111827}
+#ckSet .chk input{width:18px;height:18px;accent-color:#2457D6}
+#ckSet .acts{display:flex;justify-content:flex-end;gap:8px;padding-top:4px}
+#ckSet .acts button{height:42px;padding:0 18px;border:none;border-radius:10px;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+#ckSet .acts .ok{background:#2457D6;color:#fff}#ckSet .acts .cancel{background:#F1F3F6;color:#374151}
+#ckSet .hint{font-size:12px;color:#6B7280;line-height:1.5}
+
 #toast{position:fixed;left:50%;top:80px;transform:translateX(-50%);background:rgba(31,36,48,.85);color:#fff;
   padding:8px 18px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:40}
 
@@ -249,7 +337,7 @@ label.ib input{display:none}
   #bar{flex-wrap:wrap;justify-content:center;overflow:visible;row-gap:4px;column-gap:2px;max-width:calc(100vw - 24px);
     left:12px;right:12px;transform:none;margin:0 auto;width:fit-content} /* 가운데 정렬은 그대로, 너비는 화면만큼 쓸 수 있게 */
   #bar>.sep{display:none}
-  #pen,#marker,#laserBtn,#textBtn,#eraser{order:1}
+  #pen,#marker,#laserBtn,#textBtn,#imgBtn,#eraser{order:1}
   #undo,#clear{order:2;margin-left:4px}
   #driveOpen,#bar>label.ib,#save{order:3}
   #driveOpen{margin-left:4px}
@@ -385,6 +473,56 @@ label.ib input{display:none}
     <input id="dlgSearch" type="search" placeholder="학습지 이름으로 찾기" aria-label="학습지 이름으로 찾기">
     <div id="dlgList"></div>
     <div class="dfoot">그림판에서 연 PDF는 내 드라이브 '판서 그림판' 폴더에 자동으로 보관돼요. 드라이브에 직접 넣은 파일은 이 목록에 나오지 않으니, 처음 한 번은 기기에서 열어 주세요.</div>
+  </div>
+</div>
+
+<!-- ================= 탭 ================= -->
+<div id="tabs" role="tablist" aria-label="화면 고르기">
+  <button id="tabDraw" class="on" role="tab" aria-selected="true" title="판서"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>판서</span></button>
+  <button id="tabClock" role="tab" aria-selected="false" title="시계·타이머"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg><span>시계</span></button>
+</div>
+
+<!-- ================= 시계 · 타이머 ================= -->
+<section id="clockView" aria-label="시계와 타이머">
+  <div id="ckTitle" contenteditable="true" spellcheck="false" aria-label="제목"></div>
+  <div id="ckDate"></div>
+  <div id="ckNow" aria-live="off"></div>
+  <div id="ckTimer" hidden>
+    <div id="ckLabel">남은 시간</div>
+    <div id="ckRemain">00:00</div>
+    <div id="ckBarWrap"><div id="ckBar"></div></div>
+    <div id="ckRange"><span id="ckFrom"></span><span id="ckTo"></span></div>
+  </div>
+  <div id="ckNotice" contenteditable="true" spellcheck="false" aria-label="안내 문구"></div>
+  <div id="ckCtl">
+    <button class="ckb pri" id="ckSetBtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>시험 시간 정하기</button>
+    <button class="ckb" id="ckPause" hidden><svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg><span>일시정지</span></button>
+    <button class="ckb" id="ckStop" hidden><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>타이머 끄기</button>
+    <div class="cksep"></div>
+    <button class="ckb" id="ckSound" title="10분·5분 전과 종료 때 알림음"><svg viewBox="0 0 24 24"></svg><span></span></button>
+    <button class="ckb" id="ckTheme" title="밝은 화면 / 어두운 화면"><svg viewBox="0 0 24 24"></svg><span></span></button>
+    <button class="ckb" id="ckFs" title="전체 화면 ( F )"><svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6"/><path d="m21 3-7 7M3 21l7-7"/></svg>전체 화면</button>
+  </div>
+</section>
+
+<!-- 시험 시간 정하기 -->
+<div id="ckSet" hidden role="dialog" aria-modal="true" aria-labelledby="ckSetTitle">
+  <div class="box">
+    <h3 id="ckSetTitle">시험 시간 정하기</h3>
+    <div class="seg" id="ckMode"><button type="button" data-m="until" class="on">끝나는 시각으로</button><button type="button" data-m="count">몇 분 동안</button></div>
+    <div id="ckUntilBox">
+      <div class="row">
+        <label class="f">시작 시각<input type="time" id="ckStart"></label>
+        <label class="f">종료 시각<input type="time" id="ckEnd"></label>
+      </div>
+      <div class="hint">시작 시각 전에는 "시작까지 남은 시간"을, 시작하면 "종료까지 남은 시간"을 보여 줘요. 시작 시각을 비우면 지금부터 셉니다.</div>
+    </div>
+    <div id="ckCountBox" hidden>
+      <label class="f">시간 (분)<input type="number" id="ckMin" min="1" max="600" value="50" inputmode="numeric"></label>
+      <div class="quick" id="ckQuick"><button type="button" data-v="5">5분</button><button type="button" data-v="10">10분</button><button type="button" data-v="30">30분</button><button type="button" data-v="45">45분</button><button type="button" data-v="50">50분</button><button type="button" data-v="60">60분</button><button type="button" data-v="100">100분</button></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="ckWarn" checked>10분 전·5분 전에 색으로 알려 주기</label>
+    <div class="acts"><button type="button" class="cancel" id="ckCancel">닫기</button><button type="button" class="ok" id="ckGo">시작</button></div>
   </div>
 </div>
 
@@ -932,6 +1070,7 @@ $('save').onclick=()=>{
 
 /* ---------- 키보드 (발표용 리모컨의 PageUp/PageDown도 인식) ---------- */
 document.addEventListener('keydown',e=>{
+  if(document.body.classList.contains('clock-mode'))return; // 시계 탭에선 판서 단축키 끔
   if(e.target.tagName==='TEXTAREA'||e.target.isContentEditable)return; // 글상자에 쓰는 중엔 단축키 끔
   if(e.ctrlKey&&e.key==='z'){$('undo').click();e.preventDefault();return;}
   if(e.ctrlKey)return;
@@ -1554,6 +1693,7 @@ async function addImageBlob(blob){
   toast('그림을 넣었어요 · 끌어서 옮기고, 모서리로 크기를 바꿔요');
 }
 document.addEventListener('paste',e=>{ // Ctrl+V
+  if(document.body.classList.contains('clock-mode'))return;
   if(editing||e.target.isContentEditable||/^(INPUT|TEXTAREA)$/.test(e.target.tagName))return;
   const items=[...(e.clipboardData&&e.clipboardData.items||[])];
   const it=items.find(x=>x.kind==='file'&&/^image\//.test(x.type));
@@ -2039,6 +2179,176 @@ if(!GOOGLE_CLIENT_ID){$('loginBtn').hidden=true;$('driveOpen').hidden=true;} // 
   await openDoc(noteKeyOf('blank',noteLabel),'빈 노트');
   if(!restored&&GOOGLE_CLIENT_ID&&lsGet(LS_HINT))setSync('reconnect'); // 전에 로그인한 기기: 단추 하나 누르면 다시 연결
   renderPage();
+})();
+
+/* =====================================================================
+   시계 · 타이머 탭 (시험 시간 안내용)
+   - 큰 현재 시각, 날짜, 제목(교시·과목), 안내 문구
+   - 끝나는 시각 지정 / 몇 분 동안 카운트다운, 남은 시간·진행 막대
+   - 10분 전 노랑, 5분 전 빨강, 종료 시 깜빡임 (+ 원하면 알림음)
+   - 화면이 꺼지지 않게 유지, 설정은 이 기기에 기억
+   ===================================================================== */
+(function(){
+const $c=id=>document.getElementById(id);
+const view=$c('clockView');
+const LS='pen:clock';
+const WD=['일','월','화','수','목','금','토'];
+const pad=n=>String(n).padStart(2,'0');
+let st={title:'',notice:'',mode:'until',start:'',end:'',min:50,warn:true,sound:false,light:false,
+  run:null}; // run: {startAt,endAt,paused:false,remain}
+try{Object.assign(st,JSON.parse(localStorage.getItem(LS)||'{}'));}catch(_){}
+const save=()=>{try{localStorage.setItem(LS,JSON.stringify(st));}catch(_){}};
+$c('ckTitle').textContent=st.title||'';$c('ckNotice').textContent=st.notice||'';
+$c('ckTitle').addEventListener('input',()=>{st.title=$c('ckTitle').textContent.trim();save();});
+$c('ckNotice').addEventListener('input',()=>{st.notice=$c('ckNotice').innerText.trim();save();});
+for(const id of ['ckTitle','ckNotice'])$c(id).addEventListener('keydown',e=>{if(e.key==='Escape'||(e.key==='Enter'&&id==='ckTitle')){e.preventDefault();e.target.blur();}});
+
+/* ---- 탭 바꾸기 ---- */
+function showTab(clock){
+  document.body.classList.toggle('clock-mode',clock);
+  $c('tabDraw').classList.toggle('on',!clock);$c('tabClock').classList.toggle('on',clock);
+  $c('tabDraw').setAttribute('aria-selected',String(!clock));$c('tabClock').setAttribute('aria-selected',String(clock));
+  try{history.replaceState(null,'',clock?'#clock':location.pathname+location.search);}catch(_){}
+  if(clock){if(typeof commitText==='function')commitText();tick();keepAwake();poke();}
+  else{releaseAwake();document.body.classList.remove('ck-idle');if(typeof renderPage==='function')renderPage();}
+}
+$c('tabDraw').onclick=()=>showTab(false);
+$c('tabClock').onclick=()=>showTab(true);
+
+/* ---- 화면 꺼짐 막기 ---- */
+let lock=null;
+async function keepAwake(){try{if('wakeLock' in navigator&&!lock){lock=await navigator.wakeLock.request('screen');lock.addEventListener('release',()=>{lock=null;});}}catch(_){}}
+function releaseAwake(){try{if(lock)lock.release();}catch(_){}lock=null;}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.body.classList.contains('clock-mode'))keepAwake();});
+
+/* ---- 알림음 (파일 없이 소리 만들기) ---- */
+let actx=null;
+function beep(times=1,freq=880){
+  if(!st.sound)return;
+  try{
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    for(let i=0;i<times;i++){
+      const t=actx.currentTime+i*0.45,o=actx.createOscillator(),g=actx.createGain();
+      o.frequency.value=freq;o.type='sine';g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.4,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+0.35);
+      o.connect(g).connect(actx.destination);o.start(t);o.stop(t+0.4);
+    }
+  }catch(_){}
+}
+
+/* ---- 시간 표시 ---- */
+function fmtDur(ms){
+  const s=Math.max(0,Math.ceil(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;
+  return h?h+':'+pad(m)+':'+pad(x):pad(m)+':'+pad(x);
+}
+const hm=d=>pad(d.getHours())+':'+pad(d.getMinutes());
+let lastZone='',flashUntil=0;
+function tick(){
+  const now=new Date();
+  $c('ckDate').textContent=`${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 (${WD[now.getDay()]})`;
+  const h=now.getHours(),ap=h<12?'오전':'오후',h12=h%12||12;
+  $c('ckNow').innerHTML=`<small class="ap">${ap}</small>${h12}:${pad(now.getMinutes())}<small>:${pad(now.getSeconds())}</small>`; // 오후 7:17:10
+  const box=$c('ckTimer'),r=st.run;
+  box.hidden=!r;view.classList.toggle('timing',!!r);$c('ckStop').hidden=!r;$c('ckPause').hidden=!(r&&st.mode==='count');
+  if(!r){box.className='';lastZone='';return;}
+  const t=now.getTime();
+  let label,remain,prog,zone='';
+  if(r.paused){remain=r.remain;label='일시정지';prog=1-remain/(r.endAt-r.startAt);}
+  else if(t<r.startAt){remain=r.startAt-t;label='시작까지';prog=0;zone='pre';}
+  else{remain=r.endAt-t;label='종료까지 남은 시간';prog=(t-r.startAt)/(r.endAt-r.startAt);}
+  if(!r.paused&&t>=r.startAt){
+    if(remain<=0){zone='end';label='시험 종료';}
+    else if(st.warn&&remain<=5*60e3)zone='danger';
+    else if(st.warn&&remain<=10*60e3)zone='warn';
+  }
+  if(zone!==lastZone){ // 구간이 바뀔 때 한 번 알림
+    if(zone==='warn')beep(1,880);else if(zone==='danger')beep(2,988);else if(zone==='end'){beep(3,1175);flashUntil=t+15000;}
+    lastZone=zone;
+  }
+  $c('ckLabel').textContent=label;
+  $c('ckRemain').textContent=zone==='end'?'00:00':fmtDur(remain);
+  $c('ckBar').style.width=Math.max(0,Math.min(1,prog))*100+'%';
+  $c('ckFrom').textContent=(st.mode==='until'?'시작 ':'')+hm(new Date(r.startAt));
+  $c('ckTo').textContent='종료 '+hm(new Date(r.endAt));
+  box.className=(zone==='end'?'ended'+(t<flashUntil?' flash':''):zone==='danger'?'danger':zone==='warn'?'warn':'');
+}
+setInterval(()=>{if(document.body.classList.contains('clock-mode'))tick();},250);
+
+/* ---- 조작 막대: 3초 가만히 있으면 숨김 ---- */
+let idleT;
+function poke(){document.body.classList.remove('ck-idle');clearTimeout(idleT);idleT=setTimeout(()=>{const a=document.activeElement;if(document.body.classList.contains('clock-mode')&&$c('ckSet').hidden&&!(a&&a.isContentEditable))document.body.classList.add('ck-idle');},3000);}
+for(const ev of ['pointermove','pointerdown','keydown'])document.addEventListener(ev,()=>{if(document.body.classList.contains('clock-mode'))poke();});
+
+/* ---- 소리·테마 단추 ---- */
+const IC={
+  on:'<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>',
+  off:'<path d="M11 5 6 9H3v6h3l5 4z"/><path d="m22 9-6 6M16 9l6 6"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon:'<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>'
+};
+function syncBtns(){
+  $c('ckSound').querySelector('svg').innerHTML=st.sound?IC.on:IC.off;$c('ckSound').querySelector('span').textContent=st.sound?'알림음 켜짐':'알림음 꺼짐';
+  $c('ckTheme').querySelector('svg').innerHTML=st.light?IC.moon:IC.sun;$c('ckTheme').querySelector('span').textContent=st.light?'어둡게':'밝게';
+  view.classList.toggle('light',st.light);document.body.classList.toggle('ck-light',st.light);
+  const r=st.run;$c('ckPause').querySelector('span').textContent=r&&r.paused?'다시 시작':'일시정지';
+}
+$c('ckSound').onclick=()=>{st.sound=!st.sound;save();syncBtns();if(st.sound)beep(1,880);};
+$c('ckTheme').onclick=()=>{st.light=!st.light;save();syncBtns();};
+$c('ckFs').onclick=()=>{if(typeof toggleFullscreen==='function')toggleFullscreen();};
+
+/* ---- 시험 시간 정하기 ---- */
+function setMode(m){
+  st.mode=m;document.querySelectorAll('#ckMode [data-m]').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  $c('ckUntilBox').hidden=m!=='until';$c('ckCountBox').hidden=m!=='count';
+}
+document.querySelectorAll('#ckMode [data-m]').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+document.querySelectorAll('#ckQuick [data-v]').forEach(b=>b.onclick=()=>{$c('ckMin').value=b.dataset.v;});
+function openSet(){
+  setMode(st.mode||'until');
+  const now=new Date();
+  $c('ckStart').value=st.start||'';
+  $c('ckEnd').value=st.end||hm(new Date(now.getTime()+50*60e3));
+  $c('ckMin').value=st.min||50;$c('ckWarn').checked=st.warn!==false;
+  $c('ckSet').hidden=false;
+}
+const closeSet=()=>{$c('ckSet').hidden=true;poke();};
+$c('ckSetBtn').onclick=openSet;$c('ckCancel').onclick=closeSet;
+$c('ckSet').addEventListener('click',e=>{if(e.target.id==='ckSet')closeSet();});
+const atToday=v=>{const [h,m]=v.split(':').map(Number),d=new Date();d.setHours(h,m,0,0);return d.getTime();};
+$c('ckGo').onclick=()=>{
+  const now=Date.now();st.warn=$c('ckWarn').checked;
+  if(st.mode==='until'){
+    const ev=$c('ckEnd').value,sv=$c('ckStart').value;
+    if(!ev){toast('종료 시각을 넣어 주세요');return;}
+    let s0=sv?atToday(sv):now,e0=atToday(ev);
+    if(e0<=s0){toast('종료 시각이 시작 시각보다 늦어야 해요');return;}
+    if(e0<=now){toast('종료 시각이 이미 지났어요');return;}
+    st.start=sv;st.end=ev;st.run={startAt:s0,endAt:e0,paused:false};
+  }else{
+    const m=Math.max(1,Math.min(600,parseInt($c('ckMin').value,10)||0));
+    st.min=m;st.run={startAt:now,endAt:now+m*60e3,paused:false};
+  }
+  lastZone='';flashUntil=0;save();closeSet();syncBtns();tick();
+  if(st.sound){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume();}catch(_){}}
+};
+$c('ckPause').onclick=()=>{
+  const r=st.run;if(!r)return;const now=Date.now();
+  if(r.paused){r.endAt=now+r.remain;r.startAt=r.endAt-(r.total||r.remain);r.paused=false;}
+  else{r.total=r.endAt-r.startAt;r.remain=Math.max(0,r.endAt-now);r.paused=true;}
+  save();syncBtns();tick();
+};
+$c('ckStop').onclick=()=>{if(st.run&&!confirm('타이머를 끌까요?'))return;st.run=null;save();syncBtns();tick();};
+// 전체 화면 F, 설정 창 Esc
+document.addEventListener('keydown',e=>{
+  if(!document.body.classList.contains('clock-mode'))return;
+  if(e.key==='Escape'&&!$c('ckSet').hidden){closeSet();return;}
+  if(e.target.isContentEditable||/^(INPUT|TEXTAREA)$/.test(e.target.tagName))return;
+  if(e.key==='f'||e.key==='F'){if(typeof toggleFullscreen==='function')toggleFullscreen();}
+});
+// 하루 지난 타이머는 정리
+if(st.run&&!st.run.paused&&Date.now()>st.run.endAt+6*3600e3){st.run=null;save();}
+syncBtns();
+if(location.hash==='#clock')showTab(true);
+window.addEventListener('hashchange',()=>showTab(location.hash==='#clock')); // 주소 끝에 #clock을 붙이면 바로 시계 탭
 })();
 </script>
 </body>
