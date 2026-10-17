@@ -102,6 +102,24 @@ label.ib input{display:none}
 #pg{height:40px;padding:0 12px;border:none;border-radius:999px;background:transparent;color:var(--ink);cursor:pointer;
   font:inherit;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
 #pg:hover{background:rgba(15,23,42,.06)}
+/* 반별 필기 고르기 */
+#noteBtn{height:40px;display:flex;align-items:center;gap:6px;padding:0 12px;border:none;border-radius:999px;background:var(--accent-soft);
+  color:var(--accent);font:inherit;font-size:14px;font-weight:700;cursor:pointer;max-width:160px}
+#noteBtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#noteBtn svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#notePop{position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:45;width:min(320px,92vw);padding:14px;display:flex;flex-direction:column;gap:6px;
+  background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+#notePop .ttl{font-size:14px;font-weight:700;padding:0 4px}
+#notePop .hint{font-size:12px;color:var(--muted);padding:0 4px 4px;line-height:1.5}
+#noteList{display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 4px}
+.nchip{height:36px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:#fff;font:inherit;font-size:14px;cursor:pointer;color:var(--ink)}
+.nchip:hover{background:rgba(15,23,42,.05)}
+.nchip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.nadd{display:flex;gap:6px}
+#noteNew{flex:1;min-width:0;height:38px;padding:0 10px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:14px;outline:none}
+#noteNew:focus{border-color:var(--accent)}
+#noteAdd{height:38px;padding:0 14px;border:none;border-radius:10px;background:var(--accent);color:#fff;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.ditem .sub b{color:var(--accent);font-weight:500}
 #pgEdit{display:flex;align-items:center;gap:6px;padding:0 6px;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
 #pgInput{width:64px;height:34px;border:2px solid var(--accent);border-radius:8px;text-align:center;font:inherit;font-weight:700;outline:none;
   -moz-appearance:textfield;appearance:textfield}
@@ -196,6 +214,8 @@ label.ib input{display:none}
   <div class="sep"></div>
   <button id="pg" type="button" title="눌러서 쪽 번호로 바로 가기 ( G )" aria-label="쪽 번호로 바로 가기">1 / 1</button>
   <span id="pgEdit" hidden><input id="pgInput" type="number" inputmode="numeric" min="1" aria-label="이동할 쪽 번호"><span>/ <span id="pgTotal">1</span></span></span>
+  <div class="sep"></div>
+  <button id="noteBtn" type="button" title="반마다 따로 필기하기" aria-haspopup="true"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"/><path d="M4 19V5M8 7h7"/></svg><span id="noteName">기본</span></button>
 </div>
 
 <!-- 하단: 도구 막대 -->
@@ -253,6 +273,14 @@ label.ib input{display:none}
   <button id="syncNow" type="button">지금 저장하기</button>
   <button id="logout" type="button">로그아웃</button>
   <div class="note">필기는 내 드라이브의 '판서 그림판' 폴더에 학습지별로 저장돼요. 필요 없으면 드라이브에서 직접 지우면 돼요.</div>
+</div>
+
+<!-- 반별 필기 -->
+<div id="notePop" hidden role="dialog" aria-label="반별 필기">
+  <div class="ttl">이 학습지의 필기</div>
+  <div class="hint">같은 학습지라도 반마다 따로 필기가 저장돼요. 고르면 그 반이 쓰던 쪽으로 이어서 열려요.</div>
+  <div id="noteList"></div>
+  <div class="nadd"><input id="noteNew" type="text" maxlength="20" placeholder="새 이름 (예: 2학년 3반)" aria-label="새 필기 이름"><button id="noteAdd" type="button">만들기</button></div>
 </div>
 
 <!-- 드라이브 학습지 목록 -->
@@ -540,6 +568,7 @@ async function goPage(n){
   if(n<0||n>=pageCount){toast(n<0?'첫 페이지예요':'마지막 페이지예요');return;}
   commitText();
   page=n;laserStrokes=[];await renderPage();wrap.scrollTop=0;wrap.scrollLeft=0;toast((page+1)+' / '+pageCount);
+  if(hasInk())markDirty(); // 반마다 보던 쪽도 기억
 }
 
 /* ---------- 입력: 펜·마우스=필기 / 손가락=넘기기·이동·확대 ---------- */
@@ -691,18 +720,20 @@ async function openPdfBuffer(buf,name,size){
   await flushSave(); // 앞에서 쓰던 학습지 필기 먼저 저장
   pdf=newPdf;curPdfBytes=new Uint8Array(buf);
   pageCount=pdf.numPages;page=0;zoom=1;strokes=Array.from({length:pageCount},()=>[]);
-  await openDoc(key,name);
+  baseKey=key;noteLabel=lastLabelOf(key);
+  await openDoc(noteKeyOf(baseKey,noteLabel),name);
   await renderPage();wrap.scrollTop=0;
-  toast(name);
+  toast(noteLabel?name+' · '+noteLabel:name);
   archivePdf(); // 로그인돼 있으면 PDF도 드라이브에 보관
   return true;
 }
 async function openBlank(){
   await flushSave();
   pdf=null;curPdfBytes=null;pageCount=1;page=0;zoom=1;strokes=[[]];
-  await openDoc('blank','빈 노트');
+  baseKey='blank';noteLabel=lastLabelOf('blank');
+  await openDoc(noteKeyOf(baseKey,noteLabel),'빈 노트');
   await renderPage();wrap.scrollTop=0;
-  toast('빈 노트');
+  toast(noteLabel?'빈 노트 · '+noteLabel:'빈 노트');
 }
 $('save').onclick=()=>{
   const c=document.createElement('canvas');c.width=bg.width;c.height=bg.height;
@@ -747,6 +778,7 @@ window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setT
 const DRIVE='https://www.googleapis.com/drive/v3',UPLOAD='https://www.googleapis.com/upload/drive/v3';
 const SCOPE='https://www.googleapis.com/auth/drive.file';
 const LS_HINT='pen:loginHint',LS_DOC='pen:doc:',LS_TOK='pen:token';
+let baseKey='blank',noteLabel=''; // 학습지(PDF) 열쇠, 반 이름 — 필기 열쇠 = 학습지 열쇠 + '#반이름'
 let docKey=null,docName='',docUpdated=0,driveDirty=false,saveTimer=null,saveChain=Promise.resolve();
 let tokenClient=null,accessToken=null,tokenExp=0,user=null,folderId=null,driveIds={},lsWarned=false;
 const lsGet=k=>{try{return localStorage.getItem(k);}catch(_){return null;}};
@@ -764,7 +796,7 @@ async function docKeyOf(buf,f){
 }
 function hasInk(){return strokes.some(pg=>pg.length);}
 function serialize(){
-  return {v:1,app:'pen',key:docKey,name:docName,pageCount,updated:docUpdated,
+  return {v:1,app:'pen',key:docKey,base:baseKey,label:noteLabel,name:docName,pageCount,pg:page,updated:docUpdated,
     pages:strokes.map(pg=>pg.map(s=>s.type==='text'
       ?{t:'x',x:r4(s.x),y:r4(s.y),r:s.runs.map(r=>r.c?[r.t,r.b?1:0,r.c]:[r.t,r.b?1:0]),fs:s.fs,c:s.color}
       :{c:s.color,s:r2(s.size),a:s.angle,m:s.marker?1:0,p:s.pts.map(q=>[r4(q.x),r4(q.y),r2(q.p)])}))};
@@ -779,7 +811,7 @@ function applyData(d){
   }else{
     pageCount=Math.max(1,pages.length);strokes=pages.length?pages:[[]];
   }
-  page=Math.min(page,pageCount-1);
+  page=Math.min(d.pg!=null?d.pg:page,pageCount-1); // 그 반이 마지막으로 보던 쪽
   docUpdated=d.updated||0;
 }
 function readLocal(key){try{return JSON.parse(lsGet(LS_DOC+key));}catch(_){return null;}}
@@ -848,6 +880,7 @@ window.addEventListener('beforeunload',e=>{
 /* 학습지 열 때: 이 기기·드라이브 중 더 최근 필기를 불러옴 */
 async function openDoc(key,name){
   docKey=key;docName=name;docUpdated=0;driveDirty=false;
+  $('noteName').textContent=noteLabel||'기본';
   const local=readLocal(key);
   let remote=null;
   if(accessToken){setSync('loading');try{remote=await driveLoad(key);}catch(_){}}
@@ -985,7 +1018,7 @@ async function driveLoad(key){
   driveIds[key]=f.id;
   return await (await api(DRIVE+'/files/'+f.id+'?alt=media')).json();
 }
-function fileNameOf(name){return (name||'빈 노트').replace(/\.pdf$/i,'').replace(/[\\/:*?"<>|]/g,'_').slice(0,80)+' 필기.json';}
+function fileNameOf(name,label){return (name||'빈 노트').replace(/\.pdf$/i,'').replace(/[\\/:*?"<>|]/g,'_').slice(0,80)+(label?' ['+label.replace(/[\\/:*?"<>|]/g,'_')+']':'')+' 필기.json';}
 async function driveSave(data,retry){
   const body=JSON.stringify(data);
   let id=driveIds[data.key];
@@ -1000,7 +1033,7 @@ async function driveSave(data,retry){
     }
   }
   const parent=await ensureFolder();
-  const meta={name:fileNameOf(data.name),mimeType:'application/json',parents:[parent],appProperties:{penKey:data.key}};
+  const meta={name:fileNameOf(data.name,data.label),mimeType:'application/json',parents:[parent],appProperties:{penKey:data.key,penBase:data.base||data.key,penLabel:data.label||''}};
   const bd='pen'+Math.random().toString(36).slice(2);
   const mp='--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(meta)+
            '\r\n--'+bd+'\r\nContent-Type: application/json\r\n\r\n'+body+'\r\n--'+bd+'--';
@@ -1258,11 +1291,64 @@ if(document.fonts&&document.fonts.load){ // 캔버스 글씨용 글꼴을 미리
   Promise.all([document.fonts.load('400 20px "Noto Sans KR"'),document.fonts.load('700 20px "Noto Sans KR"')]).then(()=>redraw()).catch(()=>{});
 }
 
+/* ---------- 반별 필기 ---------- */
+// 같은 학습지(PDF)라도 반 이름마다 필기를 따로 저장. 반을 바꾸면 그 반이 보던 쪽·필기로 바뀜
+const LS_LAST='pen:lastLabel:';
+function noteKeyOf(base,label){return label?base+'#'+label:base;}
+function lastLabelOf(base){return lsGet(LS_LAST+base)||'';}
+function cleanLabel(t){return t.replace(/['"\\#]/g,'').replace(/\s+/g,' ').trim().slice(0,20);}
+function sortLabels(arr){return arr.sort((a,b)=>a===''?-1:b===''?1:a.localeCompare(b,'ko',{numeric:true}));}
+async function listLabels(){
+  const set=new Set(['',noteLabel]),pre=LS_DOC+baseKey+'#';
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith(pre))set.add(k.slice(pre.length));}}catch(_){}
+  if(accessToken){
+    try{
+      const q=encodeURIComponent("appProperties has { key='penBase' and value='"+baseKey+"' } and trashed=false");
+      const j=await (await api(DRIVE+'/files?q='+q+'&fields=files(appProperties)&pageSize=200')).json();
+      for(const f of j.files||[])set.add((f.appProperties&&f.appProperties.penLabel)||'');
+    }catch(_){}
+  }
+  return sortLabels([...set]);
+}
+function renderLabels(labels){
+  const box=$('noteList');box.textContent='';
+  for(const lb of labels){
+    const b=document.createElement('button');b.type='button';b.className='nchip'+(lb===noteLabel?' on':'');
+    b.textContent=lb||'기본';b.onclick=()=>switchLabel(lb);box.appendChild(b);
+  }
+}
+async function openNotePop(){
+  const pop=$('notePop');
+  if(!pop.hidden){pop.hidden=true;return;}
+  pop.hidden=false;$('noteNew').value='';
+  renderLabels(sortLabels([...new Set(['',noteLabel])]));
+  renderLabels(await listLabels()); // 드라이브에 있는 반 이름까지 채움
+}
+async function switchLabel(lb){
+  $('notePop').hidden=true;
+  if(lb===noteLabel)return;
+  commitText();await flushSave();
+  noteLabel=lb;lsSet(LS_LAST+baseKey,lb);
+  strokes=pdf?Array.from({length:pageCount},()=>[]):[[]];if(!pdf)pageCount=1;
+  page=0;laserStrokes=[];
+  await openDoc(noteKeyOf(baseKey,lb),docName);
+  await renderPage();wrap.scrollTop=0;
+  toast((lb||'기본')+' 필기');
+}
+$('noteBtn').onclick=e=>{e.stopPropagation();openNotePop();};
+$('noteAdd').onclick=()=>{
+  const lb=cleanLabel($('noteNew').value);
+  if(!lb){toast('반 이름을 넣어 주세요');$('noteNew').focus();return;}
+  switchLabel(lb);
+};
+$('noteNew').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('noteAdd').click();}else if(e.key==='Escape')$('notePop').hidden=true;});
+document.addEventListener('click',e=>{if(!e.target.closest('#notePop,#noteBtn'))$('notePop').hidden=true;});
+
 /* ---------- 학습지 PDF 보관 ---------- */
 // 로그인 상태에서 PDF를 열면 '판서 그림판' 폴더에 PDF를 한 번만 올려 둠 (같은 PDF는 다시 올리지 않음)
 const archived={}; // 학습지 열쇠 → 드라이브 파일 id
 async function archivePdf(){
-  const key=docKey,bytes=curPdfBytes,name=docName;
+  const key=baseKey,bytes=curPdfBytes,name=docName;
   if(!accessToken||!pdf||!bytes||!key||key==='blank'||archived[key])return;
   try{
     const q=encodeURIComponent("appProperties has { key='penPdf' and value='"+key+"' } and trashed=false");
@@ -1285,7 +1371,7 @@ async function archivePdf(){
 }
 
 /* ---------- 드라이브 학습지 목록 ---------- */
-let dlgFiles=[],dlgNoted=new Set();
+let dlgFiles=[],dlgNoted=new Set(),dlgLabels={};
 const PDF_ICON='<svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6"/></svg>';
 const BLANK_ICON='<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>';
 function fmtDate(iso){
@@ -1315,14 +1401,23 @@ async function loadDriveList(){
       api(DRIVE+'/files?q='+encodeURIComponent(base+"mimeType='application/json'")+'&fields=files(id,modifiedTime,appProperties)&pageSize=500').then(r=>r.json())
     ]);
     // 필기를 마지막으로 고친 시각을 목록 정렬에 반영
-    const noteTime={};dlgNoted=new Set();
-    for(const n of notes.files||[]){const k=n.appProperties&&n.appProperties.penKey;if(k){dlgNoted.add(k);noteTime[k]=n.modifiedTime;}}
+    const noteTime={};dlgNoted=new Set();dlgLabels={};
+    for(const n of notes.files||[]){
+      const ap=n.appProperties||{};if(!ap.penKey)continue;
+      const base=ap.penBase||ap.penKey,lb=ap.penLabel||''; // 예전 필기(반 이름 없음)는 '기본'
+      dlgNoted.add(base);(dlgLabels[base]=dlgLabels[base]||new Set()).add(lb);
+      if(!noteTime[base]||n.modifiedTime>noteTime[base])noteTime[base]=n.modifiedTime;
+    }
     dlgFiles=(pdfs.files||[]).filter(f=>f.appProperties&&f.appProperties.penPdf).map(f=>{
       const k=f.appProperties.penPdf,t=noteTime[k]&&noteTime[k]>f.modifiedTime?noteTime[k]:f.modifiedTime;
       return {id:f.id,name:f.name,key:k,time:t};
     }).sort((a,b)=>a.time<b.time?1:-1);
     renderDriveList();
   }catch(_){dlgMsg(accessToken?'목록을 불러오지 못했어요. 새로 고침을 눌러 주세요.':'드라이브 연결이 풀렸어요. 창을 닫고 다시 열어 주세요.');}
+}
+function labelsText(base){ // 목록에 반 이름들 표시: '기본, 1반, 2반'
+  const set=dlgLabels[base];if(!set||(set.size===1&&set.has('')))return '';
+  return sortLabels([...set]).map(l=>l||'기본').join(', ');
 }
 function renderDriveList(){
   const l=$('dlgList'),q=$('dlgSearch').value.trim().toLowerCase();
@@ -1338,11 +1433,11 @@ function renderDriveList(){
     b.onclick=onClick;l.appendChild(b);
   };
   if(!q||'빈 노트'.includes(q))
-    mk(BLANK_ICON,'blank','빈 노트','PDF 없이 빈 페이지에 쓰기',dlgNoted.has('blank')?'필기 있음':'',docKey==='blank',
+    mk(BLANK_ICON,'blank','빈 노트',labelsText('blank')||'PDF 없이 빈 페이지에 쓰기',dlgNoted.has('blank')?'필기 있음':'',baseKey==='blank',
       async()=>{closeDriveDlg();await openBlank();});
   const list=dlgFiles.filter(f=>!q||f.name.toLowerCase().includes(q));
   for(const f of list){
-    mk(PDF_ICON,'',f.name.replace(/\.pdf$/i,''),fmtDate(f.time),dlgNoted.has(f.key)?'필기 있음':'',docKey===f.key,
+    mk(PDF_ICON,'',f.name.replace(/\.pdf$/i,''),fmtDate(f.time)+(labelsText(f.key)?' · '+labelsText(f.key):''),dlgNoted.has(f.key)?'필기 있음':'',baseKey===f.key,
       ()=>openFromDrive(f));
   }
   if(!list.length&&!dlgFiles.length&&!q){
@@ -1375,7 +1470,8 @@ updateNib();
 if(!GOOGLE_CLIENT_ID){$('loginBtn').hidden=true;$('driveOpen').hidden=true;} // 클라이언트 ID가 없으면 로그인·드라이브 단추 숨김
 (async()=>{
   const restored=await restoreSession(); // 한 시간 안에 다시 열었으면 로그인 그대로
-  await openDoc('blank','빈 노트');
+  noteLabel=lastLabelOf('blank');
+  await openDoc(noteKeyOf('blank',noteLabel),'빈 노트');
   if(!restored&&GOOGLE_CLIENT_ID&&lsGet(LS_HINT))setSync('reconnect'); // 전에 로그인한 기기: 단추 하나 누르면 다시 연결
   renderPage();
 })();
