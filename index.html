@@ -238,7 +238,7 @@ label.ib input{display:none}
 .dfoot{padding:10px 20px 14px;border-top:1px solid var(--sep);font-size:12px;color:var(--muted);line-height:1.5}
 
 
-/* ================= 탭: 판서 / 시계 ================= */
+/* ================= 탭: 판서 / 카메라 / 시계 ================= */
 #tabs{position:fixed;top:16px;left:16px;z-index:60;display:flex;gap:2px;padding:4px;background:var(--panel);border:1px solid var(--line);
   border-radius:999px;box-shadow:var(--shadow);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
 #tabs button{height:36px;display:flex;align-items:center;gap:6px;padding:0 14px;border:none;border-radius:999px;background:transparent;
@@ -247,13 +247,63 @@ label.ib input{display:none}
 #tabs button.on{background:var(--accent);color:#fff;font-weight:700}
 @media (max-width:1180px){#tabs button span{display:none}#tabs button{padding:0 11px}}
 body.clock-mode #wrap,body.clock-mode #bar,body.clock-mode #top,body.clock-mode .side,body.clock-mode #acct,
-body.clock-mode #acctMenu,body.clock-mode #notePop,body.clock-mode #penMenu,body.clock-mode #bgMenu{display:none!important}
+body.clock-mode #acctMenu,body.clock-mode #notePop,body.clock-mode #penMenu,body.clock-mode #bgMenu,body.clock-mode #imgMenu,body.clock-mode #camPop,
+body.cam-mode #wrap,body.cam-mode #bar,body.cam-mode #top,body.cam-mode .side,body.cam-mode #acct,
+body.cam-mode #acctMenu,body.cam-mode #notePop,body.cam-mode #penMenu,body.cam-mode #bgMenu,body.cam-mode #imgMenu,body.cam-mode #camPop{display:none!important}
 #clockView{display:none}
 body.clock-mode #clockView{display:flex}
 body.clock-mode{background:var(--ck-bg)}
 body.clock-mode #tabs{background:var(--ck-panel);border-color:var(--ck-line)}
 body.clock-mode #tabs button{color:var(--ck-dim)}
 body.clock-mode #tabs button.on{background:var(--ck-accent);color:var(--ck-on-accent)}
+
+/* ================= 카메라 ================= */
+#camView{display:none;position:fixed;inset:0;z-index:50;background:#0B0D10;color:#F3F4F6;-webkit-user-select:none;user-select:none}
+body.cam-mode #camView{display:block}
+body.cam-mode{background:#0B0D10}
+body.cam-mode #tabs{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14)}
+body.cam-mode #tabs button{color:#9CA3AF}
+body.cam-mode #tabs button.on{background:#60A5FA;color:#0B1220}
+#camCanvas{position:absolute;left:0;top:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#camCanvas.panning{cursor:grabbing}
+.camHidden{position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none}
+.camMsg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;
+  text-align:center;font-size:17px;line-height:1.6;color:#D1D5DB;white-space:pre-line}
+.camMsg[hidden]{display:none}
+.camMsg button{height:44px;padding:0 20px;border:none;border-radius:12px;background:#60A5FA;color:#0B1220;font:inherit;font-weight:700;cursor:pointer}
+#camCtl{position:absolute;left:12px;right:12px;bottom:18px;margin:0 auto;width:fit-content;max-width:calc(100% - 24px);display:flex;flex-wrap:wrap;
+  align-items:center;justify-content:center;gap:4px;padding:6px;background:rgba(17,20,26,.82);border:1px solid rgba(255,255,255,.14);border-radius:16px;
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);transition:opacity .4s}
+body.cam-idle #camCtl,body.cam-idle.cam-mode #tabs{opacity:0;pointer-events:none}
+.cb{height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 10px;border:none;border-radius:10px;
+  background:transparent;color:#E5E7EB;font:inherit;font-size:14px;cursor:pointer;white-space:nowrap}
+.cb:hover{background:rgba(255,255,255,.08)}
+.cb.on{background:rgba(96,165,250,.22);color:#93C5FD}
+.cb svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.cb.primary{background:#60A5FA;color:#0B1220;font-weight:700;padding:0 16px}
+.cb.primary:hover{background:#93C5FD}
+.csep{width:1px;height:26px;background:rgba(255,255,255,.14);margin:0 4px}
+.camSel{height:40px;max-width:220px;padding:0 10px;border:1px solid rgba(255,255,255,.18);border-radius:10px;background:#161A21;color:#E5E7EB;font:inherit;font-size:14px}
+#camZoomV{min-width:58px;padding:0 6px;font-size:13px;color:#9CA3AF;font-variant-numeric:tabular-nums}
+#camFlash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
+#camFlash.go{opacity:.8;transition:none}
+@media (max-width:1180px){#camCtl .lbl{display:none}}
+/* 판서 탭에서 바로 찍기 */
+#imgMenu{position:fixed;z-index:45;width:250px;padding:6px;display:flex;flex-direction:column;gap:2px;background:#fff;
+  border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+#imgMenu button{display:flex;align-items:center;gap:12px;height:48px;padding:0 10px;border:none;border-radius:10px;background:transparent;
+  font:inherit;font-size:14px;color:var(--ink);cursor:pointer;text-align:left}
+#imgMenu button:hover{background:rgba(15,23,42,.05)}
+#imgMenu svg{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#imgMenu small{display:block;font-size:11px;color:var(--muted)}
+#imgMenu .hint{font-size:12px;color:var(--muted);padding:6px 10px 4px;border-top:1px solid var(--line);margin-top:2px}
+#camPop{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.55)}
+#camPop[hidden]{display:none}
+#camPop .box{position:relative;width:min(920px,100%);display:flex;flex-direction:column;gap:10px;padding:12px;background:#0B0D10;border-radius:16px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4)}
+#camPopStage{position:relative;width:100%;height:min(62vh,560px);border-radius:10px;overflow:hidden;background:#000}
+#camPopCanvas{width:100%;height:100%;display:block}
+#camPop .row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px}
 
 /* ================= 시계 · 타이머 ================= */
 #clockView{--ck-bg:#0E1116;--ck-panel:rgba(255,255,255,.06);--ck-line:rgba(255,255,255,.12);--ck-fg:#F3F4F6;--ck-dim:#9CA3AF;
@@ -296,7 +346,7 @@ body.clock-mode:not(.ck-light){--ck-bg:#0E1116;--ck-panel:rgba(255,255,255,.08);
 body.ck-idle #ckCtl,body.ck-idle #tabs{opacity:0;pointer-events:none}
 body.ck-idle #clockView{cursor:none}
 #tabs{transition:opacity .4s}
-@media (max-width:900px){body:not(.clock-mode) #tabs{top:auto;bottom:136px;left:12px}} /* 좁은 화면에선 위쪽 단추 줄과 겹치지 않게 */
+@media (max-width:900px){body:not(.clock-mode):not(.cam-mode) #tabs{top:auto;bottom:136px;left:12px}} /* 좁은 화면에선 위쪽 단추 줄과 겹치지 않게 */
 .ckb{height:44px;display:flex;align-items:center;gap:6px;padding:0 14px;border:none;border-radius:10px;background:transparent;color:var(--ck-fg);
   font:inherit;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap}
 .ckb:hover{background:var(--ck-panel)}
@@ -479,7 +529,50 @@ body.ck-idle #clockView{cursor:none}
 <!-- ================= 탭 ================= -->
 <div id="tabs" role="tablist" aria-label="화면 고르기">
   <button id="tabDraw" class="on" role="tab" aria-selected="true" title="판서"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>판서</span></button>
+  <button id="tabCam" role="tab" aria-selected="false" title="카메라 (실물 화상기)"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></svg><span>카메라</span></button>
   <button id="tabClock" role="tab" aria-selected="false" title="시계·타이머"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg><span>시계</span></button>
+</div>
+
+<!-- ================= 카메라 ================= -->
+<section id="camView" aria-label="카메라">
+  <canvas id="camCanvas" aria-label="카메라 화면"></canvas>
+  <div id="camFlash"></div>
+  <div class="camMsg" id="camMsg" hidden><div id="camMsgT"></div><button type="button" id="camRetry">카메라 켜기</button></div>
+  <div id="camCtl" role="toolbar" aria-label="카메라 조절">
+    <select id="camSel" class="camSel" aria-label="카메라 고르기" title="카메라 고르기"></select>
+    <div class="csep" id="camSelSep"></div>
+    <button class="cb" id="camFreeze" title="멈추기 (스페이스)"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg><span class="lbl">멈추기</span></button>
+    <button class="cb" id="camRot" title="90° 돌리기 ( R )"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg><span class="lbl">돌리기</span></button>
+    <button class="cb" id="camFlip" title="좌우 뒤집기 ( M )"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M8 7 3 12l5 5V7Z"/><path d="M16 7l5 5-5 5V7Z"/></svg><span class="lbl">좌우</span></button>
+    <div class="csep"></div>
+    <button class="cb" id="camZo" title="축소 ( - )" aria-label="축소"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="cb" id="camZoomV" title="원래 크기로 ( 0 )">100%</button>
+    <button class="cb" id="camZi" title="확대 ( + ) · 화면을 끌어서 옮겨요" aria-label="확대"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="cb" id="camFs" title="전체 화면 ( F )" aria-label="전체 화면"><svg viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg></button>
+    <div class="csep"></div>
+    <button class="cb primary" id="camShot" title="지금 화면을 찍어서 판서 탭의 지금 쪽에 넣어요 ( Enter )"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></svg><span>찍어서 판서에 넣기</span></button>
+  </div>
+  <video id="camVideo" class="camHidden" muted playsinline autoplay></video>
+</section>
+
+<!-- 판서 탭에서 그림 단추 → 넣을 방법 고르기 -->
+<div id="imgMenu" hidden role="menu" aria-label="그림 넣기">
+  <button type="button" id="imgFromFile" role="menuitem"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg><span>파일에서 고르기<small>컴퓨터·태블릿에 있는 사진</small></span></button>
+  <button type="button" id="imgFromCam" role="menuitem"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></svg><span>카메라로 찍기<small>실물 화상기·태블릿 카메라로 바로 찍어 넣기</small></span></button>
+  <div class="hint">복사한 그림은 Ctrl+V로 붙여 넣어요</div>
+</div>
+<div id="camPop" hidden role="dialog" aria-label="카메라로 찍기">
+  <div class="box">
+    <div id="camPopStage"><canvas id="camPopCanvas"></canvas><div class="camMsg" id="camPopMsg" hidden><div id="camPopMsgT"></div></div></div>
+    <div class="row">
+      <select id="camPopSel" class="camSel" aria-label="카메라 고르기"></select>
+      <button class="cb" id="camPopRot" title="90° 돌리기"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg><span>돌리기</span></button>
+      <button class="cb" id="camPopFlip" title="좌우 뒤집기"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M8 7 3 12l5 5V7Z"/><path d="M16 7l5 5-5 5V7Z"/></svg><span>좌우</span></button>
+      <div class="csep"></div>
+      <button class="cb" id="camPopClose">닫기</button>
+      <button class="cb primary" id="camPopShot"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></svg><span>찍어서 넣기</span></button>
+    </div>
+  </div>
 </div>
 
 <!-- ================= 시계 · 타이머 ================= -->
@@ -947,7 +1040,7 @@ function setTool(t){
   $('textBtn').classList.toggle('on',t==='text');$('imgBtn').classList.toggle('on',t==='image');
   ink.classList.toggle('texting',t==='text');ink.classList.toggle('imaging',t==='image');
   $('penCtl').hidden=t==='text'||t==='image';$('textCtl').hidden=t!=='text';
-  $('penType').hidden=t!=='pen';$('penMenu').hidden=true;
+  $('penType').hidden=t!=='pen';$('penMenu').hidden=true;$('imgMenu').hidden=true;
   $('angleCtl').hidden=(t==='pen'&&penType!=='cal')||t==='laser'; // 둥근 펜·레이저는 펜촉각이 필요 없음
   $('laserBtn').classList.toggle('on',t==='laser');
   ink.classList.toggle('laser',t==='laser');
@@ -979,7 +1072,19 @@ document.querySelectorAll('#penMenu [data-pt]').forEach(b=>b.onclick=()=>{setPen
 document.addEventListener('click',e=>{if(!e.target.closest('#penMenu,#penType,#pen'))$('penMenu').hidden=true;});
 $('laserBtn').onclick=()=>setTool('laser');
 $('textBtn').onclick=()=>setTool('text');
-$('imgBtn').onclick=()=>{if(tool==='image')$('imgFile').click();else{setTool('image');toast('그림을 Ctrl+V로 붙여 넣거나, 그림 단추를 한 번 더 눌러 파일을 고르세요');}};
+function openImgMenu(){
+  const m=$('imgMenu');
+  if(tool!=='image')setTool('image');
+  else if(!m.hidden){m.hidden=true;return;}
+  m.hidden=false;
+  const r=$('imgBtn').getBoundingClientRect(),mh=m.offsetHeight;
+  m.style.left=Math.max(8,Math.min(innerWidth-258,r.left+r.width/2-125))+'px';
+  m.style.top=Math.max(8,r.top-mh-10)+'px';
+}
+$('imgBtn').onclick=e=>{e.stopPropagation();openImgMenu();};
+$('imgFromFile').onclick=()=>{$('imgMenu').hidden=true;$('imgFile').click();};
+$('imgFromCam').onclick=()=>{$('imgMenu').hidden=true;if(window.camPopOpen)window.camPopOpen();};
+document.addEventListener('click',e=>{if(!e.target.closest('#imgMenu,#imgBtn'))$('imgMenu').hidden=true;});
 $('marker').onclick=()=>setTool('marker');
 $('eraser').onclick=()=>setTool('eraser');
 document.querySelectorAll('.sw[data-c]').forEach(el=>el.onclick=()=>setColor(el.dataset.c));
@@ -1070,7 +1175,8 @@ $('save').onclick=()=>{
 
 /* ---------- 키보드 (발표용 리모컨의 PageUp/PageDown도 인식) ---------- */
 document.addEventListener('keydown',e=>{
-  if(document.body.classList.contains('clock-mode'))return; // 시계 탭에선 판서 단축키 끔
+  if(document.body.classList.contains('clock-mode')||document.body.classList.contains('cam-mode'))return; // 시계·카메라 탭에선 판서 단축키 끔
+  if(!$('camPop').hidden)return;
   if(e.target.tagName==='TEXTAREA'||e.target.isContentEditable)return; // 글상자에 쓰는 중엔 단축키 끔
   if(e.ctrlKey&&e.key==='z'){$('undo').click();e.preventDefault();return;}
   if(e.ctrlKey)return;
@@ -1693,7 +1799,7 @@ async function addImageBlob(blob){
   toast('그림을 넣었어요 · 끌어서 옮기고, 모서리로 크기를 바꿔요');
 }
 document.addEventListener('paste',e=>{ // Ctrl+V
-  if(document.body.classList.contains('clock-mode'))return;
+  if(document.body.classList.contains('clock-mode')||document.body.classList.contains('cam-mode'))return;
   if(editing||e.target.isContentEditable||/^(INPUT|TEXTAREA)$/.test(e.target.tagName))return;
   const items=[...(e.clipboardData&&e.clipboardData.items||[])];
   const it=items.find(x=>x.kind==='file'&&/^image\//.test(x.type));
@@ -2204,22 +2310,33 @@ $c('ckNotice').addEventListener('input',()=>{st.notice=$c('ckNotice').innerText.
 for(const id of ['ckTitle','ckNotice'])$c(id).addEventListener('keydown',e=>{if(e.key==='Escape'||(e.key==='Enter'&&id==='ckTitle')){e.preventDefault();e.target.blur();}});
 
 /* ---- 탭 바꾸기 ---- */
-function showTab(clock){
-  document.body.classList.toggle('clock-mode',clock);
-  $c('tabDraw').classList.toggle('on',!clock);$c('tabClock').classList.toggle('on',clock);
-  $c('tabDraw').setAttribute('aria-selected',String(!clock));$c('tabClock').setAttribute('aria-selected',String(clock));
-  try{history.replaceState(null,'',clock?'#clock':location.pathname+location.search);}catch(_){}
-  if(clock){if(typeof commitText==='function')commitText();tick();keepAwake();poke();}
-  else{releaseAwake();document.body.classList.remove('ck-idle');if(typeof renderPage==='function')renderPage();}
+function curView(){const b=document.body.classList;return b.contains('clock-mode')?'clock':b.contains('cam-mode')?'camera':'draw';}
+function showView(v){
+  const prev=curView();
+  document.body.classList.toggle('clock-mode',v==='clock');
+  document.body.classList.toggle('cam-mode',v==='camera');
+  for(const [id,k] of [['tabDraw','draw'],['tabCam','camera'],['tabClock','clock']]){
+    $c(id).classList.toggle('on',v===k);$c(id).setAttribute('aria-selected',String(v===k));
+  }
+  try{history.replaceState(null,'',v==='draw'?location.pathname+location.search:'#'+v);}catch(_){}
+  if(v!=='draw'&&typeof commitText==='function')commitText();
+  if(v==='clock'){tick();poke();}else document.body.classList.remove('ck-idle');
+  if(v==='draw')releaseAwake();else keepAwake();
+  if(prev==='camera'&&v!=='camera'&&window.camLeave)window.camLeave();
+  if(v==='camera'&&prev!=='camera'&&window.camEnter)window.camEnter();
+  if(v==='draw'&&prev!=='draw'&&typeof renderPage==='function')renderPage();
 }
-$c('tabDraw').onclick=()=>showTab(false);
-$c('tabClock').onclick=()=>showTab(true);
+window.showView=showView;
+window.viewOfHash=()=>location.hash==='#clock'?'clock':location.hash==='#camera'?'camera':'draw';
+$c('tabDraw').onclick=()=>showView('draw');
+$c('tabCam').onclick=()=>showView('camera');
+$c('tabClock').onclick=()=>showView('clock');
 
 /* ---- 화면 꺼짐 막기 ---- */
 let lock=null;
 async function keepAwake(){try{if('wakeLock' in navigator&&!lock){lock=await navigator.wakeLock.request('screen');lock.addEventListener('release',()=>{lock=null;});}}catch(_){}}
 function releaseAwake(){try{if(lock)lock.release();}catch(_){}lock=null;}
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.body.classList.contains('clock-mode'))keepAwake();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&curView()!=='draw')keepAwake();});
 
 /* ---- 알림음 (파일 없이 소리 만들기) ---- */
 let actx=null;
@@ -2347,8 +2464,249 @@ document.addEventListener('keydown',e=>{
 // 하루 지난 타이머는 정리
 if(st.run&&!st.run.paused&&Date.now()>st.run.endAt+6*3600e3){st.run=null;save();}
 syncBtns();
-if(location.hash==='#clock')showTab(true);
-window.addEventListener('hashchange',()=>showTab(location.hash==='#clock')); // 주소 끝에 #clock을 붙이면 바로 시계 탭
+})();
+
+/* =====================================================================
+   카메라 탭 (실물 화상기 · USB 카메라 · 태블릿 카메라)
+   - 큰 실시간 화면, 카메라 고르기, 멈추기, 90° 돌리기, 좌우 뒤집기, 확대(끌어서 옮기기)
+   - '찍어서 판서에 넣기': 보이는 그대로 찍어서 판서 탭의 지금 쪽에 그림으로 넣음
+   - 판서 탭 그림 단추 → '카메라로 찍기' 창에서도 바로 찍어 넣을 수 있음
+   - 영상은 어디로도 보내지 않음. 탭을 떠나면 카메라를 끔
+   ===================================================================== */
+(function(){
+const $k=id=>document.getElementById(id);
+const LS='pen:cam';
+const cs={dev:'',rot:0,flip:false,zoom:1,px:0,py:0};
+try{const o=JSON.parse(localStorage.getItem(LS)||'{}');for(const k of ['dev','rot','flip'])if(k in o)cs[k]=o[k];}catch(_){}
+const save=()=>{try{localStorage.setItem(LS,JSON.stringify({dev:cs.dev,rot:cs.rot,flip:cs.flip}));}catch(_){}};
+const video=$k('camVideo');
+const frame=document.createElement('canvas'); // 멈춘 장면
+let stream=null,frozen=false,want=0,raf=0,target=null,starting=null;
+
+function msg(text,where){ // where: 'view' | 'pop'
+  const box=where==='pop'?$k('camPopMsg'):$k('camMsg'),t=where==='pop'?$k('camPopMsgT'):$k('camMsgT');
+  if(!text){box.hidden=true;return;}
+  t.textContent=text;box.hidden=false;
+}
+function errText(e){
+  const n=e&&e.name||'';
+  if(n==='NotAllowedError'||n==='SecurityError')return '카메라 사용이 막혀 있어요.\n주소창 왼쪽의 자물쇠(또는 카메라 표시)를 눌러 카메라를 허용한 뒤 다시 켜 주세요.';
+  if(n==='NotFoundError'||n==='OverconstrainedError')return '연결된 카메라를 찾지 못했어요.\n실물 화상기나 USB 카메라가 꽂혀 있는지 확인해 주세요.';
+  if(n==='NotReadableError'||n==='AbortError')return '다른 프로그램(카메라 앱, 줌, 팀즈 등)이 카메라를 쓰고 있어요.\n그 프로그램을 닫고 다시 켜 주세요.';
+  return '카메라를 켜지 못했어요. ('+(n||'알 수 없는 오류')+')';
+}
+function stop(){
+  if(stream){for(const t of stream.getTracks())t.stop();}
+  stream=null;video.srcObject=null;cancelAnimationFrame(raf);raf=0;
+}
+async function start(dev){
+  const where=target===$k('camPopCanvas')?'pop':'view';
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){msg('이 브라우저에서는 카메라를 쓸 수 없어요.\n크롬이나 엣지, 사파리 최신 버전에서 열어 주세요.',where);return false;}
+  stop();msg('',where);
+  const size={width:{ideal:1920},height:{ideal:1080}};
+  let s=null,err=null;
+  try{s=await navigator.mediaDevices.getUserMedia({audio:false,video:dev?{...size,deviceId:{exact:dev}}:{...size,facingMode:{ideal:'environment'}}});}
+  catch(e){err=e;}
+  if(!s&&dev&&err&&(err.name==='OverconstrainedError'||err.name==='NotFoundError')){ // 전에 쓰던 카메라가 빠졌으면 아무 카메라로
+    try{s=await navigator.mediaDevices.getUserMedia({audio:false,video:size});err=null;}catch(e){err=e;}
+  }
+  if(!s){msg(errText(err),where);return false;}
+  if(!want){for(const t of s.getTracks())t.stop();return false;} // 켜는 사이 탭을 떠남
+  stream=s;
+  const tr=s.getVideoTracks()[0];
+  const id=(tr.getSettings&&tr.getSettings().deviceId)||dev||'';
+  if(id){cs.dev=id;save();}
+  tr.addEventListener('ended',()=>{if(stream===s){stop();msg('카메라 연결이 끊겼어요.\n다시 꽂은 뒤 켜 주세요.',where);}});
+  video.srcObject=s;
+  try{await video.play();}catch(_){}
+  await listDevices();
+  loop();
+  return true;
+}
+async function listDevices(){
+  let ds=[];
+  try{ds=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');}catch(_){}
+  for(const sel of [$k('camSel'),$k('camPopSel')]){
+    sel.innerHTML='';
+    ds.forEach((d,i)=>{
+      const o=document.createElement('option');o.value=d.deviceId;
+      o.textContent=niceName(d.label)||('카메라 '+(i+1));
+      if(d.deviceId===cs.dev)o.selected=true;sel.appendChild(o);
+    });
+    sel.hidden=ds.length<2; // 하나뿐이면 고를 필요 없음
+    if(sel.id==='camSel')$k('camSelSep').hidden=sel.hidden;
+  }
+}
+function niceName(l){
+  if(!l)return '';
+  l=l.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i,'');
+  if(/back|rear|environment|후면/i.test(l))return '뒤쪽 카메라';
+  if(/front|user|전면/i.test(l)&&!/usb/i.test(l))return '앞쪽 카메라';
+  return l;
+}
+for(const id of ['camSel','camPopSel'])$k(id).onchange=e=>{cs.dev=e.target.value;save();frozen=false;syncBtns();start(cs.dev);};
+
+/* ---- 그리기: 돌리기·뒤집기·확대를 적용해 캔버스에 그림 ---- */
+function srcInfo(){
+  if(frozen&&frame.width)return {src:frame,w:frame.width,h:frame.height};
+  if(video.videoWidth)return {src:video,w:video.videoWidth,h:video.videoHeight};
+  return null;
+}
+const rotated=(w,h)=>cs.rot%180?[h,w]:[w,h];
+function clampPan(){const m=(cs.zoom-1)/2;cs.px=Math.max(-m,Math.min(m,cs.px));cs.py=Math.max(-m,Math.min(m,cs.py));}
+function paint(ctx,info,W,H,fitOnly){ // fitOnly: 찍을 때(W,H가 그림 크기와 같음)
+  const [rw,rh]=rotated(info.w,info.h);
+  const s0=Math.min(W/rw,H/rh),s=s0*cs.zoom;
+  ctx.save();ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  ctx.translate(W/2+cs.px*rw*s0,H/2+cs.py*rh*s0);
+  if(cs.flip)ctx.scale(-1,1);
+  ctx.rotate(cs.rot*Math.PI/180);
+  ctx.imageSmoothingQuality='high';
+  ctx.drawImage(info.src,-info.w*s/2,-info.h*s/2,info.w*s,info.h*s);
+  ctx.restore();
+}
+function fitCanvas(c){
+  const r=c.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1);
+  const w=Math.max(1,Math.round(r.width*d)),h=Math.max(1,Math.round(r.height*d));
+  if(c.width!==w||c.height!==h){c.width=w;c.height=h;}
+}
+function loop(){
+  cancelAnimationFrame(raf);
+  const step=()=>{
+    raf=requestAnimationFrame(step);
+    if(!target||!stream)return;
+    const info=srcInfo();if(!info)return;
+    fitCanvas(target);
+    paint(target.getContext('2d'),info,target.width,target.height);
+  };
+  raf=requestAnimationFrame(step);
+}
+function grab(){ // 보이는 그대로(확대한 부분만) 원래 화질로
+  const info=srcInfo();if(!info)return null;
+  const [rw,rh]=rotated(info.w,info.h);
+  const c=document.createElement('canvas');
+  const k=Math.min(1,2400/Math.max(rw,rh));
+  c.width=Math.round(rw*k);c.height=Math.round(rh*k);
+  paint(c.getContext('2d'),info,c.width,c.height,true);
+  return c;
+}
+
+/* ---- 단추 ---- */
+function syncBtns(){
+  $k('camFreeze').classList.toggle('on',frozen);
+  $k('camFreeze').querySelector('.lbl').textContent=frozen?'다시 보기':'멈추기';
+  $k('camFlip').classList.toggle('on',cs.flip);$k('camPopFlip').classList.toggle('on',cs.flip);
+  $k('camZoomV').textContent=Math.round(cs.zoom*100)+'%';
+}
+function freeze(on){
+  if(on===undefined)on=!frozen;
+  if(on){
+    if(!video.videoWidth)return;
+    frame.width=video.videoWidth;frame.height=video.videoHeight;
+    frame.getContext('2d').drawImage(video,0,0);
+  }
+  frozen=on;syncBtns();
+}
+function rotate(){cs.rot=(cs.rot+90)%360;cs.px=cs.py=0;save();}
+function flip(){cs.flip=!cs.flip;save();syncBtns();}
+function setZoom(z,ax,ay){ // ax,ay: 확대 중심(화면 가운데 기준, 표시 그림 크기 비율)
+  const old=cs.zoom;z=Math.max(1,Math.min(6,z));
+  if(ax!==undefined){cs.px=(cs.px-ax)*(z/old)+ax;cs.py=(cs.py-ay)*(z/old)+ay;}
+  else{cs.px*=z/old;cs.py*=z/old;}
+  cs.zoom=z;clampPan();syncBtns();
+}
+$k('camFreeze').onclick=()=>freeze();
+$k('camRot').onclick=rotate;$k('camPopRot').onclick=rotate;
+$k('camFlip').onclick=flip;$k('camPopFlip').onclick=flip;
+$k('camZi').onclick=()=>setZoom(cs.zoom*1.25);
+$k('camZo').onclick=()=>setZoom(cs.zoom/1.25);
+$k('camZoomV').onclick=()=>{cs.zoom=1;cs.px=cs.py=0;syncBtns();};
+$k('camFs').onclick=()=>{if(typeof toggleFullscreen==='function')toggleFullscreen();};
+$k('camRetry').onclick=()=>start(cs.dev);
+
+/* ---- 끌어서 옮기기, 두 손가락·휠로 확대 ---- */
+const cv=$k('camCanvas'),pts=new Map();let pinch=null;
+function dispSize(){const info=srcInfo();if(!info)return null;const r=cv.getBoundingClientRect();const [rw,rh]=rotated(info.w,info.h);const s0=Math.min(r.width/rw,r.height/rh);return {r,dw:rw*s0,dh:rh*s0};}
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});cv.classList.add('panning');
+  if(pts.size===2){const [a,b]=[...pts.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y),z:cs.zoom};}});
+cv.addEventListener('pointermove',e=>{
+  const p=pts.get(e.pointerId);if(!p)return;
+  const ds=dispSize();if(!ds){p.x=e.clientX;p.y=e.clientY;return;}
+  if(pts.size===2&&pinch){
+    p.x=e.clientX;p.y=e.clientY;const [a,b]=[...pts.values()];
+    const d=Math.hypot(a.x-b.x,a.y-b.y),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+    setZoom(pinch.z*d/pinch.d,(mx-ds.r.left-ds.r.width/2)/ds.dw,(my-ds.r.top-ds.r.height/2)/ds.dh);return;
+  }
+  if(cs.zoom>1){cs.px+=(e.clientX-p.x)/ds.dw;cs.py+=(e.clientY-p.y)/ds.dh;clampPan();}
+  p.x=e.clientX;p.y=e.clientY;
+});
+const up=e=>{pts.delete(e.pointerId);if(pts.size<2)pinch=null;if(!pts.size)cv.classList.remove('panning');};
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('wheel',e=>{e.preventDefault();const ds=dispSize();if(!ds)return;
+  setZoom(cs.zoom*Math.exp(-e.deltaY*0.0015),(e.clientX-ds.r.left-ds.r.width/2)/ds.dw,(e.clientY-ds.r.top-ds.r.height/2)/ds.dh);},{passive:false});
+cv.addEventListener('dblclick',()=>{if(cs.zoom>1){cs.zoom=1;cs.px=cs.py=0;}else setZoom(2);syncBtns();});
+
+/* ---- 찍어서 판서에 넣기 ---- */
+function flash(){const f=$k('camFlash');f.classList.add('go');requestAnimationFrame(()=>requestAnimationFrame(()=>f.classList.remove('go')));}
+async function shoot(){
+  const c=grab();
+  if(!c){if(typeof toast==='function')toast('카메라 화면이 아직 없어요');return;}
+  flash();
+  const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.9));
+  if(!blob)return;
+  $k('camPop').hidden=true;
+  if(document.body.classList.contains('cam-mode'))window.showView('draw');else{want=0;stop();}
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  if(typeof addImageBlob==='function')await addImageBlob(blob);
+}
+$k('camShot').onclick=shoot;$k('camPopShot').onclick=shoot;
+
+/* ---- 탭 들어가고 나가기 ---- */
+let idleT=0;
+function poke(){document.body.classList.remove('cam-idle');clearTimeout(idleT);
+  idleT=setTimeout(()=>{if(document.body.classList.contains('cam-mode')&&!pts.size&&document.activeElement.tagName!=='SELECT')document.body.classList.add('cam-idle');},3500);}
+for(const ev of ['pointermove','pointerdown','keydown'])document.addEventListener(ev,()=>{if(document.body.classList.contains('cam-mode'))poke();});
+window.camEnter=()=>{want=1;target=cv;frozen=false;syncBtns();poke();if(!stream)start(cs.dev);else loop();};
+window.camLeave=()=>{want=0;stop();frozen=false;document.body.classList.remove('cam-idle');};
+window.camPopOpen=()=>{
+  if(typeof commitText==='function')commitText();
+  $k('camPop').hidden=false;want=1;target=$k('camPopCanvas');frozen=false;cs.zoom=1;cs.px=cs.py=0;syncBtns();
+  if(!stream)start(cs.dev);else loop();
+};
+function popClose(){$k('camPop').hidden=true;if(!document.body.classList.contains('cam-mode')){want=0;stop();}}
+$k('camPopClose').onclick=popClose;
+$k('camPop').addEventListener('pointerdown',e=>{if(e.target===$k('camPop'))popClose();});
+document.addEventListener('visibilitychange',()=>{ // 다른 앱으로 가면 카메라를 끄고, 돌아오면 다시 켬
+  if(document.hidden){if(stream){stop();}}
+  else if(want&&!stream&&!frozen)start(cs.dev);
+});
+if(navigator.mediaDevices&&navigator.mediaDevices.addEventListener)
+  navigator.mediaDevices.addEventListener('devicechange',()=>{if(stream)listDevices();else if(want)start(cs.dev);});
+
+// 단축키: 스페이스 멈추기, R 돌리기, M 좌우, +/- 확대, 0 원래대로, F 전체 화면, Enter 찍어서 넣기
+document.addEventListener('keydown',e=>{
+  if(!$k('camPop').hidden){
+    if(e.key==='Escape'){e.preventDefault();popClose();}
+    else if(e.key==='Enter'||e.key===' '){e.preventDefault();shoot();}
+    return;
+  }
+  if(!document.body.classList.contains('cam-mode'))return;
+  if(e.ctrlKey||e.metaKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))return;
+  const k=e.key;
+  if(k===' '){e.preventDefault();freeze();}
+  else if(k==='Enter'){e.preventDefault();shoot();}
+  else if(k==='r'||k==='R')rotate();
+  else if(k==='m'||k==='M')flip();
+  else if(k==='+'||k==='=')setZoom(cs.zoom*1.25);
+  else if(k==='-')setZoom(cs.zoom/1.25);
+  else if(k==='0'){cs.zoom=1;cs.px=cs.py=0;syncBtns();}
+  else if(k==='f'||k==='F'){if(typeof toggleFullscreen==='function')toggleFullscreen();}
+});
+syncBtns();
+
+// 주소 끝에 #camera 또는 #clock을 붙이면 바로 그 탭으로
+if(window.viewOfHash()!=='draw')window.showView(window.viewOfHash());
+window.addEventListener('hashchange',()=>window.showView(window.viewOfHash()));
 })();
 </script>
 </body>
