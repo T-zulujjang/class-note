@@ -588,7 +588,7 @@ body.ck-idle #clockView{cursor:none}
   </div>
   <div id="ckNotice" contenteditable="true" spellcheck="false" aria-label="안내 문구"></div>
   <div id="ckCtl">
-    <button class="ckb pri" id="ckSetBtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>시험 시간 정하기</button>
+    <button class="ckb pri" id="ckSetBtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>타이머 맞추기</button>
     <button class="ckb" id="ckPause" hidden><svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg><span>일시정지</span></button>
     <button class="ckb" id="ckStop" hidden><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>타이머 끄기</button>
     <div class="cksep"></div>
@@ -598,10 +598,10 @@ body.ck-idle #clockView{cursor:none}
   </div>
 </section>
 
-<!-- 시험 시간 정하기 -->
+<!-- 타이머 맞추기 -->
 <div id="ckSet" hidden role="dialog" aria-modal="true" aria-labelledby="ckSetTitle">
   <div class="box">
-    <h3 id="ckSetTitle">시험 시간 정하기</h3>
+    <h3 id="ckSetTitle">타이머 맞추기</h3>
     <div class="seg" id="ckMode"><button type="button" data-m="until" class="on">끝나는 시각으로</button><button type="button" data-m="count">몇 분 동안</button></div>
     <div id="ckUntilBox">
       <div class="row">
@@ -2288,7 +2288,7 @@ if(!GOOGLE_CLIENT_ID){$('loginBtn').hidden=true;$('driveOpen').hidden=true;} // 
 })();
 
 /* =====================================================================
-   시계 · 타이머 탭 (시험 시간 안내용)
+   시계 · 타이머 탭 (시험·활동 시간 안내용)
    - 큰 현재 시각, 날짜, 제목(교시·과목), 안내 문구
    - 끝나는 시각 지정 / 몇 분 동안 카운트다운, 남은 시간·진행 막대
    - 10분 전 노랑, 5분 전 빨강, 종료 시 깜빡임 (+ 원하면 알림음)
@@ -2373,7 +2373,7 @@ function tick(){
   else if(t<r.startAt){remain=r.startAt-t;label='시작까지';prog=0;zone='pre';}
   else{remain=r.endAt-t;label='종료까지 남은 시간';prog=(t-r.startAt)/(r.endAt-r.startAt);}
   if(!r.paused&&t>=r.startAt){
-    if(remain<=0){zone='end';label='시험 종료';}
+    if(remain<=0){zone='end';label='시간 종료';}
     else if(st.warn&&remain<=5*60e3)zone='danger';
     else if(st.warn&&remain<=10*60e3)zone='warn';
   }
@@ -2412,7 +2412,7 @@ $c('ckSound').onclick=()=>{st.sound=!st.sound;save();syncBtns();if(st.sound)beep
 $c('ckTheme').onclick=()=>{st.light=!st.light;save();syncBtns();};
 $c('ckFs').onclick=()=>{if(typeof toggleFullscreen==='function')toggleFullscreen();};
 
-/* ---- 시험 시간 정하기 ---- */
+/* ---- 타이머 맞추기 ---- */
 function setMode(m){
   st.mode=m;document.querySelectorAll('#ckMode [data-m]').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
   $c('ckUntilBox').hidden=m!=='until';$c('ckCountBox').hidden=m!=='count';
