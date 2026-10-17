@@ -488,7 +488,7 @@ function syncSwatches(){
 }
 function setColor(c){
   if(tool==='marker')markerColor=c;
-  else if(tool==='text'){textColor=c;applyTextStyle();}
+  else if(tool==='text'){textColor=c;colorSelection(c);}
   else{penColor=c;if(tool==='eraser'||tool==='laser')setTool('pen');}
   syncSwatches();updateNib();
 }
@@ -746,7 +746,7 @@ window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setT
    ========================================================== */
 const DRIVE='https://www.googleapis.com/drive/v3',UPLOAD='https://www.googleapis.com/upload/drive/v3';
 const SCOPE='https://www.googleapis.com/auth/drive.file';
-const LS_HINT='pen:loginHint',LS_DOC='pen:doc:';
+const LS_HINT='pen:loginHint',LS_DOC='pen:doc:',LS_TOK='pen:token';
 let docKey=null,docName='',docUpdated=0,driveDirty=false,saveTimer=null,saveChain=Promise.resolve();
 let tokenClient=null,accessToken=null,tokenExp=0,user=null,folderId=null,driveIds={},lsWarned=false;
 const lsGet=k=>{try{return localStorage.getItem(k);}catch(_){return null;}};
@@ -766,13 +766,13 @@ function hasInk(){return strokes.some(pg=>pg.length);}
 function serialize(){
   return {v:1,app:'pen',key:docKey,name:docName,pageCount,updated:docUpdated,
     pages:strokes.map(pg=>pg.map(s=>s.type==='text'
-      ?{t:'x',x:r4(s.x),y:r4(s.y),r:s.runs.map(r=>[r.t,r.b?1:0]),fs:s.fs,c:s.color}
+      ?{t:'x',x:r4(s.x),y:r4(s.y),r:s.runs.map(r=>r.c?[r.t,r.b?1:0,r.c]:[r.t,r.b?1:0]),fs:s.fs,c:s.color}
       :{c:s.color,s:r2(s.size),a:s.angle,m:s.marker?1:0,p:s.pts.map(q=>[r4(q.x),r4(q.y),r2(q.p)])}))};
 }
 function applyData(d){
   const pages=(d.pages||[]).map(pg=>pg.map(s=>s.t==='x'
     ?{type:'text',x:s.x,y:s.y,fs:s.fs||32,color:s.c,
-      runs:s.r?s.r.map(r=>({t:r[0],b:!!r[1]})):[{t:s.tx||'',b:!!s.b}]} // 예전 형식(전체 굵기)도 읽음
+      runs:s.r?s.r.map(r=>({t:r[0],b:!!r[1],c:r[2]||null})):[{t:s.tx||'',b:!!s.b,c:null}]} // 예전 형식(전체 굵기)도 읽음
     :{color:s.c,size:s.s,angle:s.a,marker:!!s.m,pts:s.p.map(q=>({x:q[0],y:q[1],p:q[2]}))}));
   if(pdf){ // PDF 쪽수에 맞춤
     strokes=Array.from({length:pageCount},(_,i)=>pages[i]||[]);
@@ -873,6 +873,7 @@ function connect(prompt){
         toast('드라이브 저장 권한을 허용해야 저장할 수 있어요');if(done)done(false);return;
       }
       accessToken=r.access_token;tokenExp=Date.now()+((+r.expires_in||3600)-60)*1000;
+      lsSet(LS_TOK,JSON.stringify({t:accessToken,e:tokenExp})); // 새로고침해도 한 시간 동안은 로그인 유지
       await afterLogin();if(done)done(true);
     },
     error_callback:()=>{const done=pendingLogin;pendingLogin=null;if(done)done(false);} // 창을 닫았거나 팝업이 막힘
@@ -930,22 +931,37 @@ $('logout').onclick=async()=>{
   $('acctMenu').classList.remove('open');
   await flushSave();
   if(accessToken&&gisReady())google.accounts.oauth2.revoke(accessToken,()=>{});
-  accessToken=null;user=null;folderId=null;driveIds={};lsDel(LS_HINT);
+  accessToken=null;user=null;folderId=null;driveIds={};lsDel(LS_HINT);lsDel(LS_TOK);
   showUser();setSync('local');toast('로그아웃했어요. 필기는 이 기기에 계속 저장돼요');
 };
 // 전에 로그인했던 기기라면: 처음 버튼을 누를 때 자동으로 다시 연결 (구글 창이 잠깐 떴다 닫힘)
 // 한 시간쯤 지나 연결이 풀렸을 때도 같은 방식으로 다시 연결
+// 연결이 곧 풀릴 때(10분 이내)도 단추를 누르는 김에 미리 새로 받아 둠 → 수업 중에 풀리는 일을 줄임
 document.addEventListener('click',e=>{
-  if(syncState!=='reconnect'||!lsGet(LS_HINT))return;
+  if(!GOOGLE_CLIENT_ID||!lsGet(LS_HINT))return;
   if(!e.target.closest('#bar,#top,.side')||e.target.closest('input'))return;
-  connect('');
+  const soon=accessToken&&tokenExp-Date.now()<10*60*1000;
+  if(syncState==='reconnect'||soon)connect('');
 },true);
+// 연결 시간이 지나면 상태 표시를 '다시 연결'로 바꿈
+setInterval(()=>{if(accessToken&&Date.now()>tokenExp){accessToken=null;lsDel(LS_TOK);setSync('reconnect');}},60*1000);
+// 새로고침·새 탭: 아직 유효한 연결이 있으면 그대로 이어 씀
+async function restoreSession(){
+  if(!GOOGLE_CLIENT_ID||!lsGet(LS_HINT))return false;
+  let t=null;try{t=JSON.parse(lsGet(LS_TOK));}catch(_){}
+  if(!t||!t.t||t.e<Date.now()+60*1000){lsDel(LS_TOK);return false;}
+  accessToken=t.t;tokenExp=t.e;
+  try{
+    const a=await (await api(DRIVE+'/about?fields=user(displayName,emailAddress,photoLink)')).json();
+    user=a.user;showUser();return true;
+  }catch(_){accessToken=null;lsDel(LS_TOK);return false;}
+}
 
 /* ---------- 드라이브 API ---------- */
 async function api(url,opts={}){
   if(!accessToken||Date.now()>tokenExp){accessToken=null;setSync('reconnect');throw new Error('no token');}
   const r=await fetch(url,{...opts,headers:{...(opts.headers||{}),Authorization:'Bearer '+accessToken}});
-  if(r.status===401){accessToken=null;setSync('reconnect');throw new Error('401');}
+  if(r.status===401){accessToken=null;lsDel(LS_TOK);setSync('reconnect');throw new Error('401');}
   if(!r.ok){const err=new Error('http '+r.status);err.status=r.status;throw err;}
   return r;
 }
@@ -1034,7 +1050,7 @@ function runsText(runs){return runs.map(r=>r.t).join('');}
 function linesOf(runs){ // 조각들을 줄 단위로 나눔
   const lines=[[]];
   for(const r of runs){
-    r.t.split('\n').forEach((pt,i)=>{if(i>0)lines.push([]);if(pt)lines[lines.length-1].push({t:pt,b:r.b});});
+    r.t.split('\n').forEach((pt,i)=>{if(i>0)lines.push([]);if(pt)lines[lines.length-1].push({t:pt,b:r.b,c:r.c});});
   }
   return lines;
 }
@@ -1045,11 +1061,11 @@ function drawText(s){
   if(s._editing)return;
   const fpx=s.fs*W/1000,lh=fpx*TEXT_LH,off=fpx*(TEXT_LH-1)/2; // 입력칸과 같은 자리에 오도록 줄 간격만큼 내림
   const lines=linesOf(s.runs);
-  ctx.fillStyle=s.color;ctx.textBaseline='top';
+  ctx.textBaseline='top';
   let maxW=0;
   lines.forEach((ln,i)=>{
     let x=s.x*W;
-    for(const seg of ln){ctx.font=fontOf(s.fs,seg.b);ctx.fillText(seg.t,x,s.y*W+off+i*lh);x+=ctx.measureText(seg.t).width;}
+    for(const seg of ln){ctx.font=fontOf(s.fs,seg.b);ctx.fillStyle=seg.c||s.color;ctx.fillText(seg.t,x,s.y*W+off+i*lh);x+=ctx.measureText(seg.t).width;}
     maxW=Math.max(maxW,x-s.x*W);
   });
   s._bb={x0:s.x,y0:s.y,x1:s.x+Math.max(maxW,fpx*0.5)/W,y1:s.y+lines.length*lh/W};
@@ -1094,25 +1110,43 @@ function editText(item){
 }
 /* 입력칸 ↔ 조각(runs) */
 function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function runsToHtml(runs){return runs.map(r=>r.b?'<b>'+esc(r.t)+'</b>':esc(r.t)).join('');}
+function runsToHtml(runs){
+  return runs.map(r=>{
+    let h=esc(r.t);
+    if(r.b)h='<b>'+h+'</b>';
+    if(r.c)h='<font color="'+r.c+'">'+h+'</font>';
+    return h;
+  }).join('');
+}
+function toHex(rgb){ // 'rgb(210, 49, 43)' → '#d2312b'
+  const m=rgb.match(/\d+(\.\d+)?/g);if(!m)return rgb;
+  return '#'+m.slice(0,3).map(v=>(+v|0).toString(16).padStart(2,'0')).join('');
+}
 function htmlToRuns(root){
-  const out=[];
-  const push=(t,b)=>{if(!t)return;const last=out[out.length-1];if(last&&last.b===b)last.t+=t;else out.push({t,b});};
-  const isBold=el=>{const w=getComputedStyle(el).fontWeight;return w==='bold'||parseInt(w,10)>=600;};
-  (function walk(node,bold){
+  // 글씨 조각마다 실제로 보이는 굵기·색을 읽어서 조각(runs)으로 바꿈
+  const out=[],base=toHex(getComputedStyle(root).color);
+  const push=(t,b,c)=>{
+    if(!t)return;const last=out[out.length-1];
+    if(last&&last.b===b&&last.c===c)last.t+=t;else out.push({t,b,c});
+  };
+  const styleOf=el=>{
+    const cs=getComputedStyle(el),w=cs.fontWeight,col=toHex(cs.color);
+    return {b:w==='bold'||parseInt(w,10)>=600,c:col===base?null:col};
+  };
+  (function walk(node){
     for(const ch of node.childNodes){
-      if(ch.nodeType===3){push(ch.nodeValue.replace(/ /g,' '),bold);continue;}
+      if(ch.nodeType===3){const st=styleOf(ch.parentElement);push(ch.nodeValue.replace(/ /g,' '),st.b,st.c);continue;}
       if(ch.nodeType!==1)continue;
-      if(ch.tagName==='BR'){push('\n',bold);continue;}
+      if(ch.tagName==='BR'){const st=styleOf(node);push('\n',st.b,st.c);continue;}
       const block=/^(DIV|P)$/.test(ch.tagName);
-      if(block&&out.length&&!out[out.length-1].t.endsWith('\n'))push('\n',bold); // 줄바꿈으로 생긴 덩어리
-      walk(ch,isBold(ch));
+      if(block&&out.length&&!out[out.length-1].t.endsWith('\n')){const st=styleOf(node);push('\n',st.b,st.c);} // 줄바꿈으로 생긴 덩어리
+      walk(ch);
     }
-  })(root,false);
+  })(root);
   return out;
 }
 function openEditor(item,isNew){
-  editing={item,isNew,pg:page};
+  editing={item,isNew,pg:page};lastRange=null;
   item._editing=true;if(!isNew)redraw();
   ta.innerHTML=runsToHtml(item.runs);
   ta.hidden=false;tframe.hidden=false;thandle.hidden=false;
@@ -1136,9 +1170,9 @@ function styleEditor(){
   tframe.style.left=X-7+'px';tframe.style.top=Y-7+'px';tframe.style.width=w+14+'px';tframe.style.height=h+14+'px';
   thandle.style.left=X-7-34+'px';thandle.style.top=Y-7+'px';
 }
-function applyTextStyle(){ // 크기·색을 바꾸면 지금 쓰는 글상자 전체에 바로 적용
+function applyTextStyle(){ // 크기를 바꾸면 지금 쓰는 글상자 전체에 바로 적용
   if(!editing)return;
-  const s=editing.item;s.fs=textSize;s.color=textColor;
+  const s=editing.item;s.fs=textSize;
   styleEditor();ta.focus();
 }
 function commitText(){
@@ -1171,10 +1205,21 @@ ta.addEventListener('paste',e=>{ // 붙여넣기는 글씨만
   document.execCommand('insertText',false,t);
 });
 ta.addEventListener('pointerdown',e=>e.stopPropagation());
+let lastRange=null; // 색 고르기 창을 여는 동안 블록이 풀려도 기억해 둔 블록에 색을 칠함
 document.addEventListener('selectionchange',()=>{ // 커서 자리의 굵기를 B 단추에 표시
   if(!editing||document.activeElement!==ta)return;
+  const sel=getSelection();if(sel.rangeCount&&ta.contains(sel.anchorNode))lastRange=sel.getRangeAt(0).cloneRange();
   $('boldBtn').setAttribute('aria-pressed',document.queryCommandState('bold')?'true':'false');
 });
+function colorSelection(c){
+  // 쓰는 중이면: 블록한 글씨만 그 색으로 (블록이 없으면 이어서 쓰는 글씨부터). 쓰는 중이 아니면 다음 글상자 색만 바뀜
+  if(!editing)return;
+  ta.focus();
+  if(lastRange&&ta.contains(lastRange.startContainer)){const sel=getSelection();sel.removeAllRanges();sel.addRange(lastRange);}
+  document.execCommand('styleWithCSS',false,false);
+  document.execCommand('foreColor',false,c);
+  styleEditor();
+}
 function toggleBold(){
   if(editing){
     ta.focus();
@@ -1329,8 +1374,9 @@ syncSwatches();
 updateNib();
 if(!GOOGLE_CLIENT_ID){$('loginBtn').hidden=true;$('driveOpen').hidden=true;} // 클라이언트 ID가 없으면 로그인·드라이브 단추 숨김
 (async()=>{
+  const restored=await restoreSession(); // 한 시간 안에 다시 열었으면 로그인 그대로
   await openDoc('blank','빈 노트');
-  if(GOOGLE_CLIENT_ID&&lsGet(LS_HINT))setSync('reconnect'); // 전에 로그인한 기기
+  if(!restored&&GOOGLE_CLIENT_ID&&lsGet(LS_HINT))setSync('reconnect'); // 전에 로그인한 기기: 단추 하나 누르면 다시 연결
   renderPage();
 })();
 </script>
