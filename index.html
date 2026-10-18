@@ -39,13 +39,15 @@ button{font-family:inherit}
 #hl{opacity:.45;mix-blend-mode:multiply;pointer-events:none} /* 형광펜 층: 반투명, 글씨가 비쳐 보임 */
 /* 위아래 넘김: 쪽들을 세로로 이어 붙이고, 지금 쓰는 쪽 위에만 필기 판(#stage)을 얹음 */
 #pages{display:flex;flex-direction:column;align-items:center;gap:24px;width:max-content;min-width:100%} /* 넓게 확대해도 왼쪽이 잘리지 않게 */
-.slot{position:relative;flex:none;background:#fff;border-radius:6px;touch-action:pan-x pan-y;
+.slot{position:relative;flex:none;background:#fff;border-radius:6px;touch-action:none;
   box-shadow:0 2px 6px rgba(15,23,42,.06),0 16px 48px rgba(15,23,42,.12)}
 .slot>canvas{position:absolute;left:0;top:0;border-radius:6px;pointer-events:none}
 .slot>canvas.shl{opacity:.45;mix-blend-mode:multiply}
 #wrap.vmode #stage{position:absolute;left:0;top:0;margin:0;background:transparent;box-shadow:none}
 #wrap.vmode #stage #bg{visibility:hidden} /* 바탕은 아래 쪽 그림이 보여 줌 */
 #ink{touch-action:none;cursor:crosshair}
+#wrap{touch-action:none;-webkit-touch-callout:none} /* 손가락 넘기기·확대는 직접 처리 → 브라우저가 펜 입력을 가로채지 않게 */
+#wrap *{-webkit-touch-callout:none}
 #ink.laser{cursor:none}
 #laser{pointer-events:none} /* 레이저 층: 저장·되돌리기와 상관없이 잠깐 보였다 사라짐 */
 #ink.texting{cursor:text}
@@ -955,15 +957,34 @@ async function goPage(n){
 }
 
 /* ---------- 입력: 펜·마우스=필기 / 손가락=넘기기·이동·확대 ---------- */
-const touches=new Map();let gesture=null;
+const touches=new Map();let gesture=null,lastPenUp=0,fling=0;
+const PALM=40; // 이보다 넓게 닿으면 손바닥으로 봄 (CSS 픽셀)
+function touchDown(e,el){
+  if(cur||Date.now()-lastPenUp<400)return; // 펜으로 쓰는 중·쓴 직후의 손바닥 터치는 무시
+  if((e.width||0)>PALM&&(e.height||0)>PALM)return; // 넓게 닿은 손바닥
+  stopFling();
+  try{el.setPointerCapture(e.pointerId);}catch(_){}
+  touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  startGesture();
+}
+function cancelTouches(){ // 펜이 닿으면 손가락 동작은 그 자리에서 멈춤
+  if(gesture&&gesture.type==='pinch'&&zs)zoomCommit();
+  touches.clear();gesture=null;stopFling();
+}
 ink.addEventListener('pointerdown',e=>inkDown(e));
+// 쪽 바깥 여백·다른 쪽 위에서도 손가락으로 넘기기·확대
+wrap.addEventListener('pointerdown',e=>{
+  if(e.pointerType!=='touch'||e.target===ink||e.target.closest('#imgSel,#textHandle,#textEdit,button,a,input,select'))return;
+  touchDown(e,wrap);
+});
 function inkDown(e){
-  if(e.pointerType==='touch'){
-    if(cur)return; // 펜으로 쓰는 중엔 손바닥 터치 무시
-    ink.setPointerCapture(e.pointerId);
-    touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    startGesture();return;
-  }
+  if(e.pointerType==='touch'){touchDown(e,ink);return;}
+  if(cur)finishStroke(); // 앞 획이 끝나지 않은 채 남아 있으면 마무리
+  cancelTouches();
+  penDown(e);
+  if(cur)cur.pid=e.pointerId;
+}
+function penDown(e){
   if(e.ctrlKey){const l=linkAt(e.clientX,e.clientY);if(l){openLink(l);return;}} // Ctrl+클릭으로 링크 열기
   ink.setPointerCapture(e.pointerId);
   if(tool==='text'&&e.button!==5){textDown(pos(e));return;}
@@ -977,14 +998,15 @@ function inkDown(e){
   if(!marker&&penType!=='cal')cur.pt=penType; // 볼펜·붓펜
   strokes[page].push(cur);drawStroke(cur);
 }
-ink.addEventListener('pointermove',e=>{
+// 움직임·뗌은 창 전체에서 받음 → 판이 옮겨지거나 캡처가 풀려도 획이 끊기지 않음
+window.addEventListener('pointermove',e=>{
   if(e.pointerType==='touch'){
-    if(!touches.has(e.pointerId))return;
-    touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    const q=touches.get(e.pointerId);if(!q)return;
+    q.x=e.clientX;q.y=e.clientY;
     moveGesture();return;
   }
-  if(tool==='laser'){hoverPt=pos(e);kickLaser();}
-  if(!cur)return;
+  if(tool==='laser'&&(cur||e.target===ink)){hoverPt=pos(e);kickLaser();}
+  if(!cur||e.pointerId!==cur.pid)return;
   const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];
   for(const ev of evs){
     const p=pos(ev);
@@ -1001,14 +1023,37 @@ function endPointer(e){
     if(!touches.has(e.pointerId))return;
     touches.delete(e.pointerId);endGesture();return;
   }
+  if(!cur||e.pointerId!==cur.pid)return;
+  finishStroke();
+}
+function finishStroke(){
+  lastPenUp=Date.now();
   if(cur&&cur.textDrag){const c=cur;cur=null;textUp(c);return;}
   if(cur&&cur.laser){cur.s.end=performance.now();kickLaser();}
   else if(cur&&(!cur.erase||cur.changed))markDirty(); // 한 획 끝날 때마다 자동 저장 예약
   cur=null;
 }
-ink.addEventListener('pointerup',endPointer);
-ink.addEventListener('pointercancel',endPointer);
-ink.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch'){hoverPt=null;kickLaser();}});
+window.addEventListener('pointerup',endPointer);
+window.addEventListener('pointercancel',endPointer);
+ink.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch'&&!cur){hoverPt=null;kickLaser();}});
+// 아이패드: 화면 끌기·돋보기·길게 눌러 선택이 펜 입력을 끊지 않게
+wrap.addEventListener('touchmove',e=>{if(!e.target.closest('#textEdit'))e.preventDefault();},{passive:false});
+wrap.addEventListener('touchstart',e=>{
+  if([...e.changedTouches].some(t=>t.touchType==='stylus')&&!e.target.closest('#textEdit,#imgSel,#textHandle'))e.preventDefault();
+},{passive:false});
+// 손가락으로 밀고 놓으면 조금 더 미끄러지게
+function stopFling(){if(fling){cancelAnimationFrame(fling);fling=0;}}
+function startFling(vx,vy){
+  stopFling();let last=performance.now();
+  const step=t=>{
+    const dt=Math.min(40,t-last);last=t;
+    wrap.scrollLeft-=vx*dt;wrap.scrollTop-=vy*dt;
+    const k=Math.pow(0.95,dt/16);vx*=k;vy*=k;
+    if(Math.hypot(vx,vy)<0.03){fling=0;if(vmode){clearTimeout(scrollTimer);scrollTimer=setTimeout(pickByScroll,150);}return;}
+    fling=requestAnimationFrame(step);
+  };
+  fling=requestAnimationFrame(step);
+}
 
 function startGesture(){
   const pts=[...touches.values()];
@@ -1026,6 +1071,8 @@ function moveGesture(){
   if(gesture.type==='pan'&&pts.length===1){
     const p=pts[0];
     wrap.scrollLeft-=p.x-gesture.lx;wrap.scrollTop-=p.y-gesture.ly;
+    const now=performance.now(),dt=Math.max(1,now-(gesture.lt||now-16)); // 손가락 속도 (부드럽게)
+    gesture.vx=(gesture.vx||0)*0.6+(p.x-gesture.lx)/dt*0.4;gesture.vy=(gesture.vy||0)*0.6+(p.y-gesture.ly)/dt*0.4;gesture.lt=now;
     gesture.lx=p.x;gesture.ly=p.y;
   }else if(gesture.type==='pinch'&&pts.length>=2){
     const [a,b]=pts,d=Math.hypot(a.x-b.x,a.y-b.y);
@@ -1051,6 +1098,8 @@ function endGesture(){
     else if(!vmode&&!overflowX&&Math.abs(dx)>80&&Math.abs(dx)>Math.abs(dy)*1.5&&dt<800){
       goPage(page+(dx<0?1:-1));
     }
+    else if((vmode||overflowX||wrap.scrollHeight>wrap.clientHeight+2)&&performance.now()-(gesture.lt||0)<80&&Math.hypot(gesture.vx||0,gesture.vy||0)>0.15)
+      startFling(gesture.vx,gesture.vy);
   }
   if(touches.size===0)gesture=null;
 }
@@ -1715,7 +1764,7 @@ function scrollToSlot(n){
   wrap.scrollTop+=sl.el.getBoundingClientRect().top-wrap.getBoundingClientRect().top-pad;
 }
 function pickByScroll(){ // 화면 가운데쯤에 걸친 쪽으로 판을 옮김
-  if(!vmode||cur||editing||zs||touches.size||gesture||Date.now()<noPickUntil)return;
+  if(!vmode||cur||editing||zs||touches.size||gesture||fling||Date.now()<noPickUntil)return;
   const r=wrap.getBoundingClientRect(),cy=r.top+r.height*0.4;
   for(let i=0;i<slots.length;i++){
     const b=slots[i].el.getBoundingClientRect();
