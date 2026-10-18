@@ -7,8 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="판서 그림판">
-<title>캘리그래피 판서 그림판</title>
+<meta name="apple-mobile-web-app-title" content="클래스 노트">
+<title>클래스 노트</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -506,7 +506,7 @@ body.ck-idle #clockView{cursor:none}
   <button id="openFolder" type="button">드라이브에서 저장 파일 보기</button>
   <button id="syncNow" type="button">지금 저장하기</button>
   <button id="logout" type="button">로그아웃</button>
-  <div class="note">필기는 내 드라이브의 '판서 그림판' 폴더에 학습지별로 저장돼요. 필요 없으면 드라이브에서 직접 지우면 돼요.</div>
+  <div class="note">필기는 내 드라이브의 '클래스 노트' 폴더에 학습지별로 저장돼요. 필요 없으면 드라이브에서 직접 지우면 돼요.</div>
 </div>
 
 <!-- 바탕 무늬 -->
@@ -542,7 +542,7 @@ body.ck-idle #clockView{cursor:none}
     <form id="dlgNew" autocomplete="off"><input id="dlgNewName" type="text" maxlength="40" placeholder="새 빈 노트 이름 (비워 두면 날짜로)" aria-label="새 빈 노트 이름"><button id="dlgNewGo" type="submit"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>새 빈 노트</button></form>
     <input id="dlgSearch" type="search" placeholder="학습지·노트 이름으로 찾기" aria-label="학습지·노트 이름으로 찾기">
     <div id="dlgList"></div>
-    <div class="dfoot">그림판에서 연 PDF는 내 드라이브 '판서 그림판' 폴더에 자동으로 보관돼요. 드라이브에 직접 넣은 파일은 이 목록에 나오지 않으니, 처음 한 번은 기기에서 열어 주세요.</div>
+    <div class="dfoot">클래스 노트에서 연 PDF는 내 드라이브 '클래스 노트' 폴더에 자동으로 보관돼요. 드라이브에 직접 넣은 파일은 이 목록에 나오지 않으니, 처음 한 번은 기기에서 열어 주세요.</div>
   </div>
 </div>
 
@@ -1238,7 +1238,7 @@ window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setT
 /* ==========================================================
    저장·불러오기
    - 항상: 이 기기(브라우저)에 자동 저장 → 로그인 안 해도 같은 기기에서 이어 쓰기
-   - 로그인하면: 내 구글 드라이브 '판서 그림판' 폴더에도 자동 저장 → 다른 기기에서 이어 쓰기
+   - 로그인하면: 내 구글 드라이브 '클래스 노트' 폴더에도 자동 저장 → 다른 기기에서 이어 쓰기
    - 드라이브 권한은 drive.file: 이 그림판이 만든 파일만 보고 고칠 수 있음
    ========================================================== */
 const DRIVE='https://www.googleapis.com/drive/v3',UPLOAD='https://www.googleapis.com/upload/drive/v3';
@@ -1476,13 +1476,19 @@ async function api(url,opts={}){
   if(!r.ok){const err=new Error('http '+r.status);err.status=r.status;throw err;}
   return r;
 }
+const FOLDER_NAME='클래스 노트';
 async function ensureFolder(){
   if(folderId)return folderId;
   const q=encodeURIComponent("mimeType='application/vnd.google-apps.folder' and appProperties has { key='penApp' and value='folder' } and trashed=false");
-  const j=await (await api(DRIVE+'/files?q='+q+'&fields=files(id)')).json();
-  if(j.files&&j.files.length){folderId=j.files[0].id;return folderId;}
+  const j=await (await api(DRIVE+'/files?q='+q+'&fields=files(id,name)')).json();
+  if(j.files&&j.files.length){
+    folderId=j.files[0].id;
+    if(j.files[0].name==='판서 그림판') // 예전 이름의 폴더는 새 이름으로 바꿔 줌 (실패해도 그대로 씀)
+      api(DRIVE+'/files/'+folderId,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:FOLDER_NAME})}).catch(()=>{});
+    return folderId;
+  }
   const c=await (await api(DRIVE+'/files?fields=id',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({name:'판서 그림판',mimeType:'application/vnd.google-apps.folder',appProperties:{penApp:'folder'}})})).json();
+    body:JSON.stringify({name:FOLDER_NAME,mimeType:'application/vnd.google-apps.folder',appProperties:{penApp:'folder'}})})).json();
   folderId=c.id;return folderId;
 }
 async function findDocFile(key){
@@ -2188,7 +2194,7 @@ $('noteNew').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault
 document.addEventListener('click',e=>{if(!e.target.closest('#notePop,#noteBtn'))$('notePop').hidden=true;});
 
 /* ---------- 학습지 PDF 보관 ---------- */
-// 로그인 상태에서 PDF를 열면 '판서 그림판' 폴더에 PDF를 한 번만 올려 둠 (같은 PDF는 다시 올리지 않음)
+// 로그인 상태에서 PDF를 열면 '클래스 노트' 폴더에 PDF를 한 번만 올려 둠 (같은 PDF는 다시 올리지 않음)
 const archived={}; // 학습지 열쇠 → 드라이브 파일 id
 async function archivePdf(){
   const key=baseKey,bytes=curPdfBytes,name=docName;
