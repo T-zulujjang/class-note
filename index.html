@@ -469,15 +469,7 @@ body.ck-idle #clockView{cursor:none}
   <div class="sep"></div>
   <div class="brk" aria-hidden="true"></div>
   <div class="swatches" id="swatches">
-    <button class="sw on" style="background:#111827" data-c="#111827" title="검정" aria-label="검정"></button>
-    <button class="sw" style="background:#D2312B" data-c="#D2312B" title="빨강" aria-label="빨강"></button>
-    <button class="sw" style="background:#EA6A0C" data-c="#EA6A0C" title="주황" aria-label="주황"></button>
-    <button class="sw light" style="background:#FACC15" data-c="#FACC15" title="노랑" aria-label="노랑"></button>
-    <button class="sw" style="background:#15803D" data-c="#15803D" title="초록" aria-label="초록"></button>
-    <button class="sw" style="background:#1D4FC4" data-c="#1D4FC4" title="파랑" aria-label="파랑"></button>
-    <button class="sw" style="background:#7C3AED" data-c="#7C3AED" title="보라" aria-label="보라"></button>
-    <button class="sw" style="background:#8B5A2B" data-c="#8B5A2B" title="갈색" aria-label="갈색"></button>
-    <button class="sw light" style="background:#FFFFFF" data-c="#FFFFFF" title="흰색 (칠판 바탕에)" aria-label="흰색"></button>
+    <!-- 색 단추는 아래 스크립트가 만듦: 검정 · (최근 고른 색 → 기본색) · 흰색 -->
     <label class="sw" id="custom" title="색 직접 고르기" aria-label="색 직접 고르기"><input type="color" id="customInput" value="#E11D48"></label>
   </div>
   <div class="sep"></div>
@@ -670,7 +662,7 @@ let hctx=hl.getContext('2d'),ctx=ink.getContext('2d'); // 다른 쪽 그림을 �
 const MIN_ZOOM=0.5,MAX_ZOOM=4;
 const MARKER_SCALE=2.5; // 형광펜은 펜보다 굵게
 let pdf=null,page=0,pageCount=1,strokes=[[]],tool='pen',cur=null;
-let penColor='#111827',markerColor='#FACC15',textColor='#111827'; // 펜·형광펜·글상자는 색을 따로 기억
+let penColor='#111827',markerColor='#FFD500',textColor='#111827'; // 펜·형광펜·글상자는 색을 따로 기억
 let textSize=32,textBold=false; // 글상자 기본 크기·굵기
 let W=0,H=0,zoom=1,blankRatio=null,renderTask=null,renderId=0;
 let pmap=[]; // 화면의 쪽 → PDF 쪽 번호(1부터). 0이면 중간에 끼워 넣은 빈 페이지
@@ -912,7 +904,7 @@ function syncSwatches(){
     const on=el.dataset.c.toLowerCase()===c;el.classList.toggle('on',on);if(on)found=true;
   });
   $('custom').classList.toggle('on',!found);
-  if(!found){$('custom').style.background=c;}
+  $('custom').style.background=found?'':c; // 목록에 있는 색이면 무지개로 되돌림
 }
 function setColor(c){
   if(tool==='marker')markerColor=c;
@@ -1223,8 +1215,34 @@ $('imgFromCam').onclick=()=>{$('imgMenu').hidden=true;if(window.camPopOpen)windo
 document.addEventListener('click',e=>{if(!e.target.closest('#imgMenu,#imgBtn'))$('imgMenu').hidden=true;});
 $('marker').onclick=()=>setTool('marker');
 $('eraser').onclick=()=>setTool('eraser');
-document.querySelectorAll('.sw[data-c]').forEach(el=>el.onclick=()=>setColor(el.dataset.c));
-$('customInput').addEventListener('input',e=>setColor(e.target.value));
+/* 색 단추: 검정 · 가운데 7칸 · 흰색. 가운데는 최근에 직접 고른 색이 앞에서부터 하나씩 채우고, 남는 칸은 기본색 */
+const BASE_COLORS=[['#FF0000','빨강'],['#FF7A00','주황'],['#FFD500','노랑'],['#00A83C','초록'],['#0047FF','파랑'],['#8B00FF','보라'],['#8B4500','갈색']]; // 채도 최고
+let recentColors=[];try{recentColors=JSON.parse(localStorage.getItem('pen:recentColors')||'[]').filter(c=>/^#[0-9a-f]{6}$/i.test(c)).slice(0,7);}catch(_){}
+function isLight(c){const n=parseInt(c.slice(1),16),r=n>>16,g=n>>8&255,b=n&255;return 0.299*r+0.587*g+0.114*b>200;}
+function renderSwatches(){
+  const box=$('swatches'),custom=$('custom');
+  box.querySelectorAll('.sw[data-c]').forEach(el=>el.remove());
+  const rec=recentColors.map(c=>[c,'최근 고른 색 '+c.toUpperCase(),1]);
+  const base=BASE_COLORS.filter(([c])=>!recentColors.includes(c.toLowerCase()));
+  const list=[['#111827','검정'],...rec,...base].slice(0,8).concat([['#FFFFFF','흰색 (칠판 바탕에)']]);
+  for(const [c,name,recent] of list){
+    const b=document.createElement('button');b.type='button';
+    b.className='sw'+(isLight(c)?' light':'')+(recent?' recent':'');b.style.background=c;b.dataset.c=c;b.title=name;b.setAttribute('aria-label',name);
+    box.insertBefore(b,custom);
+  }
+  syncSwatches();
+}
+function addRecent(c){
+  c=c.toLowerCase();if(c==='#111827'||c==='#ffffff'||c==='#000000')return;
+  if(BASE_COLORS.some(([b])=>b.toLowerCase()===c)&&!recentColors.includes(c))return; // 기본색과 같으면 그대로
+  recentColors=[c,...recentColors.filter(x=>x!==c)].slice(0,7);
+  try{localStorage.setItem('pen:recentColors',JSON.stringify(recentColors));}catch(_){}
+  renderSwatches();
+}
+$('swatches').addEventListener('click',e=>{const el=e.target.closest('.sw[data-c]');if(el)setColor(el.dataset.c);});
+$('customInput').addEventListener('input',e=>setColor(e.target.value)); // 고르는 동안 바로 반영
+$('customInput').addEventListener('change',e=>{setColor(e.target.value);addRecent(e.target.value);}); // 다 고르면 최근 색에 넣음
+renderSwatches();
 $('size').oninput=()=>{updateNib();if(tool==='laser')kickLaser();}; // 레이저 점 크기도 바로 바뀜
 $('angle').oninput=updateNib;
 $('undo').onclick=()=>{commitText();selectImg(null);if(strokes[page].pop()){redraw();markDirty();}};
@@ -2286,7 +2304,7 @@ $('fsize').addEventListener('change',()=>{setTextCtl(clamp(parseInt($('fsize').v
 $('fsize').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('fsize').dispatchEvent(new Event('change'));}});
 $('boldBtn').addEventListener('pointerdown',e=>e.preventDefault()); // 누를 때 블록 선택이 풀리지 않게
 $('boldBtn').onclick=toggleBold;
-document.querySelectorAll('.sw').forEach(el=>el.addEventListener('pointerdown',e=>{if(editing&&!el.querySelector('input'))e.preventDefault();}));
+$('swatches').addEventListener('pointerdown',e=>{const el=e.target.closest('.sw');if(el&&editing&&!el.querySelector('input'))e.preventDefault();});
 if(document.fonts&&document.fonts.load){ // 캔버스 글씨용 글꼴을 미리 불러와서 다시 그림
   Promise.all([document.fonts.load('400 20px "Noto Sans KR"'),document.fonts.load('700 20px "Noto Sans KR"')]).then(()=>redraw()).catch(()=>{});
 }
