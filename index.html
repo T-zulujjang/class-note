@@ -1028,13 +1028,14 @@ function inkDown(e){
 }
 // 펜 옆 단추(S펜 버튼 = 오른쪽 단추)나 펜 뒤쪽 지우개를 누르고 있으면 지우개
 const penBtnErase=e=>e.pointerType==='pen'&&(((e.buttons||0)&34)!==0||e.button===2||e.button===5);
-let tempErase=false;
+let tempErase=false,penContact=false; // penContact: 펜이 pointerdown으로 정상적으로 닿아 있는 중
 function showTempErase(on){ // 단추를 누르는 동안만 지우개 단추에 불이 들어옴
   if(on===tempErase)return;tempErase=on;
   $('eraser').classList.toggle('on',on||tool==='eraser');
   for(const [id,t] of [['pen','pen'],['marker','marker'],['laserBtn','laser'],['textBtn','text'],['imgBtn','image']])$(id).classList.toggle('on',!on&&tool===t);
 }
 function penDown(e){
+  if(e.pointerType==='pen')penContact=true;
   const btnErase=penBtnErase(e);
   if(btnErase){showTempErase(true);if(editing)commitText();}
   if(e.ctrlKey){const l=linkAt(e.clientX,e.clientY);if(l){openLink(l);return;}} // Ctrl+클릭으로 링크 열기
@@ -1060,7 +1061,12 @@ window.addEventListener('pointermove',e=>{
   if(e.pointerType==='pen'){
     penSeen();
     const be=penBtnErase(e);
-    if(!cur)showTempErase(be); // 떠 있는 채로 단추를 누르면 지우개로 보였다가, 놓으면 원래대로
+    // 갤럭시 크롬: S펜 단추를 누른 채 대면 pointerdown 없이 buttons=1인 움직임만 옴 → 그 움직임을 지우개로
+    const ghost=!penContact&&(e.buttons&1)===1;
+    if(ghost&&!cur&&e.pressure>0&&e.target.closest&&e.target.closest('#wrap')){
+      cur={erase:true,changed:eraseAt(pos(e)),btn:true,ghost:true,pid:e.pointerId};showTempErase(true);
+    }else if(cur&&cur.ghost&&e.pointerId===cur.pid&&(!(e.buttons&1)||e.pressure===0)){finishStroke();}
+    if(!cur)showTempErase(be||ghost); // 떠 있는 채로 단추를 누르면 지우개로 보였다가, 놓으면 원래대로
     else if(be&&!cur.erase&&!cur.laser&&!cur.textDrag&&e.pointerId===cur.pid){ // 쓰는 도중 단추를 누르면 그 자리부터 지우개
       if(cur.pts&&cur.pts.length<2){const L=strokes[page],i=L.indexOf(cur);if(i>=0)L.splice(i,1);redraw();}
       else markDirty();
@@ -1081,6 +1087,7 @@ window.addEventListener('pointermove',e=>{
   }
 });
 function endPointer(e){
+  if(e.pointerType==='pen')penContact=false;
   if(e.pointerType==='touch'){
     if(!touches.has(e.pointerId))return;
     touches.delete(e.pointerId);endGesture();return;
@@ -1115,7 +1122,7 @@ if(location.hash==='#pentest'){
   const log=t=>{if(t===last)return;last=t;lines.unshift(t);lines.length=Math.min(lines.length,26);box.textContent='펜 단추 점검 (이 화면을 찍어 보내 주세요)\n'+lines.join('\n');};
   const pe=e=>`${e.type} 종류=${e.pointerType} button=${e.button} buttons=${e.buttons} 압력=${(e.pressure||0).toFixed(2)} 기울기=${e.tiltX||0},${e.tiltY||0}`;
   for(const t of ['pointerdown','pointerup','pointercancel'])window.addEventListener(t,e=>log(pe(e)),true);
-  window.addEventListener('pointermove',e=>log(pe(e).replace(/ 압력=.*/,'')),true);
+  window.addEventListener('pointermove',e=>log(pe(e).replace(/ 기울기=.*/,'').replace(/압력=0\.\d\d/,m=>+m.slice(3)>0?'압력>0':'압력=0')),true);
   for(const t of ['contextmenu','auxclick','mousedown','mouseup'])window.addEventListener(t,e=>log(`${t} button=${e.button} buttons=${e.buttons}`),true);
   window.addEventListener('keydown',e=>log(`keydown key=${e.key} code=${e.code} keyCode=${e.keyCode}`),true);
   window.addEventListener('touchstart',e=>log(`touchstart 손가락수=${e.touches.length} 종류=${[...e.changedTouches].map(t=>t.touchType||'-').join(',')} 반지름=${[...e.changedTouches].map(t=>Math.round(t.radiusX||0)).join(',')}`),true);
