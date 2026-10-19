@@ -907,7 +907,7 @@ function zoomPreview(newZoom,cx,cy){
   newZoom=clamp(newZoom,MIN_ZOOM,MAX_ZOOM);
   if(!zs){
     const el=zoomEl(),r=el.getBoundingClientRect();
-    zs={el,ox:cx-r.left,oy:cy-r.top,cx,cy,startZoom:zoom,target:zoom,dx:0,dy:0};
+    zs={el,ox:cx-r.left,oy:cy-r.top,cx,cy,startZoom:zoom,target:zoom,dx:0,dy:0,an:anchorAt(cx,cy)};
     el.style.transformOrigin=zs.ox+'px '+zs.oy+'px';
   }
   zs.target=newZoom;
@@ -915,18 +915,30 @@ function zoomPreview(newZoom,cx,cy){
   zs.el.style.transform=`translate(${zs.dx}px,${zs.dy}px) scale(${s})`;
   $('zoomLbl').textContent=Math.round(newZoom*100)+'%';
 }
+// 확대 기준점: 손가락(마우스) 아래에 있던 쪽과 그 쪽 안의 위치를 기억
+function anchorAt(cx,cy){
+  if(vmode&&slots.length){
+    let best=0,bd=1e9;
+    slots.forEach((sl,i)=>{const r=sl.el.getBoundingClientRect(),d=cy<r.top?r.top-cy:cy>r.bottom?cy-r.bottom:0;if(d<bd){bd=d;best=i;}});
+    const r=slots[best].el.getBoundingClientRect();
+    return {i:best,u:(cx-r.left)/r.width,v:(cy-r.top)/r.width};
+  }
+  const r=stage.getBoundingClientRect();
+  return {i:-1,u:(cx-r.left)/r.width,v:(cy-r.top)/r.width};
+}
 async function zoomCommit(){
   if(!zs)return;
-  const z=zs,oldW=W;
+  const z=zs;
   zs=null;
-  const fx=z.ox/oldW,fy=z.oy/oldW;
   const anchorX=z.cx+z.dx,anchorY=z.cy+z.dy;
   z.el.style.transform='';
   zoom=z.target;
   await renderPage();
-  const r=zoomEl().getBoundingClientRect();
-  wrap.scrollLeft+=r.left+fx*W-anchorX;
-  wrap.scrollTop+=r.top+fy*W-anchorY;
+  // 기억한 쪽 위치가 손가락 아래로 다시 오게 (쪽 사이 간격은 확대되지 않아 생기던 흔들림 없앰)
+  const el=z.an&&z.an.i>=0&&slots[z.an.i]?slots[z.an.i].el:stage,r=el.getBoundingClientRect();
+  noPickUntil=Date.now()+300;
+  wrap.scrollLeft+=r.left+z.an.u*r.width-anchorX;
+  wrap.scrollTop+=r.top+z.an.v*r.width-anchorY;
 }
 const zoomEl=()=>vmode?$('pages'):stage; // 위아래 방식에선 쪽 묶음 전체를 확대
 function zoomTo(newZoom){
@@ -957,11 +969,11 @@ async function goPage(n){
 }
 
 /* ---------- 입력: 펜·마우스=필기 / 손가락=넘기기·이동·확대 ---------- */
-const touches=new Map();let gesture=null,lastPenUp=0,fling=0;
-const PALM=40; // 이보다 넓게 닿으면 손바닥으로 봄 (CSS 픽셀)
+const touches=new Map();let gesture=null,lastPenUp=0,fling=0,penUsed=false;
+const PALM=70; // 펜을 쓰는 기기에서 이보다 넓게 닿으면 손바닥으로 봄 (CSS 픽셀, 아이패드는 손가락도 40px 넘게 잡힘)
 function touchDown(e,el){
   if(cur||Date.now()-lastPenUp<400)return; // 펜으로 쓰는 중·쓴 직후의 손바닥 터치는 무시
-  if((e.width||0)>PALM&&(e.height||0)>PALM)return; // 넓게 닿은 손바닥
+  if(penUsed&&(e.width||0)>PALM&&(e.height||0)>PALM)return; // 넓게 닿은 손바닥
   stopFling();
   try{el.setPointerCapture(e.pointerId);}catch(_){}
   touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -979,6 +991,7 @@ wrap.addEventListener('pointerdown',e=>{
 });
 function inkDown(e){
   if(e.pointerType==='touch'){touchDown(e,ink);return;}
+  if(e.pointerType==='pen')penUsed=true;
   if(cur)finishStroke(); // 앞 획이 끝나지 않은 채 남아 있으면 마무리
   cancelTouches();
   penDown(e);
@@ -1038,7 +1051,10 @@ window.addEventListener('pointercancel',endPointer);
 ink.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch'&&!cur){hoverPt=null;kickLaser();}});
 // 아이패드: 화면 끌기·돋보기·길게 눌러 선택이 펜 입력을 끊지 않게
 wrap.addEventListener('touchmove',e=>{if(!e.target.closest('#textEdit'))e.preventDefault();},{passive:false});
+// 아이패드: 두 손가락은 사파리 자체 확대 대신 클래스 노트 확대로
+for(const g of ['gesturestart','gesturechange','gestureend'])document.addEventListener(g,e=>{if(e.target.closest&&e.target.closest('#wrap'))e.preventDefault();},{passive:false});
 wrap.addEventListener('touchstart',e=>{
+  if(e.touches.length>1&&!e.target.closest('#textEdit')){e.preventDefault();return;}
   if([...e.changedTouches].some(t=>t.touchType==='stylus')&&!e.target.closest('#textEdit,#imgSel,#textHandle'))e.preventDefault();
 },{passive:false});
 // 손가락으로 밀고 놓으면 조금 더 미끄러지게
