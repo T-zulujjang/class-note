@@ -1026,15 +1026,25 @@ function inkDown(e){
   penDown(e);
   if(cur)cur.pid=e.pointerId;
 }
+// 펜 옆 단추(S펜 버튼 = 오른쪽 단추)나 펜 뒤쪽 지우개를 누르고 있으면 지우개
+const penBtnErase=e=>e.pointerType==='pen'&&(((e.buttons||0)&34)!==0||e.button===2||e.button===5);
+let tempErase=false;
+function showTempErase(on){ // 단추를 누르는 동안만 지우개 단추에 불이 들어옴
+  if(on===tempErase)return;tempErase=on;
+  $('eraser').classList.toggle('on',on||tool==='eraser');
+  for(const [id,t] of [['pen','pen'],['marker','marker'],['laserBtn','laser'],['textBtn','text'],['imgBtn','image']])$(id).classList.toggle('on',!on&&tool===t);
+}
 function penDown(e){
+  const btnErase=penBtnErase(e);
+  if(btnErase){showTempErase(true);if(editing)commitText();}
   if(e.ctrlKey){const l=linkAt(e.clientX,e.clientY);if(l){openLink(l);return;}} // Ctrl+클릭으로 링크 열기
   ink.setPointerCapture(e.pointerId);
-  if(tool==='text'&&e.button!==5){textDown(pos(e));return;}
-  if(tool==='image'){selectImg(imgAt(pos(e)));return;} // 그림 고르기
-  if(tool==='laser'&&e.button!==5){
+  if(tool==='text'&&!btnErase){textDown(pos(e));return;}
+  if(tool==='image'&&!btnErase){selectImg(imgAt(pos(e)));return;} // 그림 고르기
+  if(tool==='laser'&&!btnErase){
     const p=pos(e);cur={laser:true,s:{pts:[p],end:null,w:laserScale()}};laserStrokes.push(cur.s);hoverPt=p;kickLaser();return;
   }
-  if(tool==='eraser'||e.button===5){cur={erase:true,changed:eraseAt(pos(e))};return;} // 펜 뒤쪽 지우개도 인식
+  if(tool==='eraser'||btnErase){cur={erase:true,changed:eraseAt(pos(e)),btn:btnErase};return;} // 펜 단추·뒤쪽 지우개도 인식
   const marker=tool==='marker',size=+$('size').value;
   cur={color:curColor(),size:marker?size*MARKER_SCALE:penType==='cal'?calSize(size):size,angle:+$('angle').value,marker,pts:[pos(e)]};
   if(!marker&&penType!=='cal')cur.pt=penType; // 볼펜·붓펜
@@ -1047,7 +1057,16 @@ window.addEventListener('pointermove',e=>{
     q.x=e.clientX;q.y=e.clientY;
     moveGesture();return;
   }
-  if(e.pointerType==='pen')penSeen();
+  if(e.pointerType==='pen'){
+    penSeen();
+    const be=penBtnErase(e);
+    if(!cur)showTempErase(be); // 떠 있는 채로 단추를 누르면 지우개로 보였다가, 놓으면 원래대로
+    else if(be&&!cur.erase&&!cur.laser&&!cur.textDrag&&e.pointerId===cur.pid){ // 쓰는 도중 단추를 누르면 그 자리부터 지우개
+      if(cur.pts&&cur.pts.length<2){const L=strokes[page],i=L.indexOf(cur);if(i>=0)L.splice(i,1);redraw();}
+      else markDirty();
+      cur={erase:true,changed:eraseAt(pos(e)),btn:true,pid:e.pointerId};showTempErase(true);
+    }
+  }
   if(tool==='laser'&&(cur||e.target===ink)){hoverPt=pos(e);kickLaser();}
   if(!cur||e.pointerId!==cur.pid)return;
   const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];
@@ -1071,6 +1090,7 @@ function endPointer(e){
 }
 function finishStroke(){
   lastPenUp=Date.now();
+  if(cur&&cur.btn)setTimeout(()=>{if(!cur)showTempErase(false);},0); // 단추 지우개가 끝나면 원래 도구로
   if(cur&&cur.textDrag){const c=cur;cur=null;textUp(c);return;}
   if(cur&&cur.laser){cur.s.end=performance.now();kickLaser();}
   else if(cur&&(!cur.erase||cur.changed))markDirty(); // 한 획 끝날 때마다 자동 저장 예약
@@ -1078,7 +1098,8 @@ function finishStroke(){
 }
 window.addEventListener('pointerup',endPointer);
 window.addEventListener('pointercancel',endPointer);
-ink.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch'&&!cur){hoverPt=null;kickLaser();}});
+ink.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch'&&!cur){hoverPt=null;kickLaser();if(e.pointerType==='pen')showTempErase(false);}});
+wrap.addEventListener('contextmenu',e=>e.preventDefault()); // 펜 단추를 오른쪽 클릭으로 보는 기기에서 메뉴가 뜨지 않게
 // 아이패드: 화면 끌기·돋보기·길게 눌러 선택이 펜 입력을 끊지 않게
 wrap.addEventListener('touchmove',e=>{if(!e.target.closest('#textEdit'))e.preventDefault();},{passive:false});
 // 아이패드: 두 손가락은 사파리 자체 확대 대신 클래스 노트 확대로
