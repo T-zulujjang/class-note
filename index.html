@@ -679,6 +679,7 @@ function innerSize(){
     h:wrap.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom)
   };
 }
+let afterLayout=null,lastBgKey='';
 async function renderPage(){
   const myId=++renderId;
   const inner=innerSize(),baseW=Math.max(200,inner.w);
@@ -697,11 +698,20 @@ async function renderPage(){
   // 캔버스가 너무 커지지 않게 해상도 제한 (태블릿 메모리 보호)
   const dpr=window.devicePixelRatio||1;
   const pr=Math.min(dpr,Math.sqrt(16e6/(W*H)));
+  // 같은 쪽을 다시 그릴 때(확대 등)는 옛 바탕을 잠깐 늘려 보여 줌 → 하얗게 번쩍이지 않음
+  let snap=null;
+  if(p&&!vmode&&bg.width&&lastBgKey===docKey+'#'+page){snap=document.createElement('canvas');snap.width=bg.width;snap.height=bg.height;snap.getContext('2d').drawImage(bg,0,0);}
   setSize(pr);
+  if(snap)bctx.drawImage(snap,0,0,bg.width,bg.height);
+  redraw(); // 필기도 바로 다시 그림 (바탕을 기다리지 않음)
+  if(afterLayout){const f=afterLayout;afterLayout=null;f();} // 확대 마무리: 같은 순간에 위치를 맞춤
   if(p){
     if(renderTask){try{renderTask.cancel();}catch(_){}}
-    renderTask=p.render({canvasContext:bctx,viewport:p.getViewport({scale:(W/v0.width)*pr})});
+    const o=document.createElement('canvas');o.width=bg.width;o.height=bg.height;
+    renderTask=p.render({canvasContext:o.getContext('2d'),viewport:p.getViewport({scale:(W/v0.width)*pr})});
     try{await renderTask.promise;}catch(_){return;}
+    if(myId!==renderId)return;
+    bctx.setTransform(1,0,0,1,0,0);bctx.drawImage(o,0,0);lastBgKey=docKey+'#'+page;
   }else{
     bctx.setTransform(pr,0,0,pr,0,0);drawPaper(bctx,W,H,bgOf(page));bctx.setTransform(1,0,0,1,0,0); // 빈 페이지 바탕 무늬
   }
@@ -931,14 +941,22 @@ async function zoomCommit(){
   const z=zs;
   zs=null;
   const anchorX=z.cx+z.dx,anchorY=z.cy+z.dy;
-  z.el.style.transform='';
   zoom=z.target;
+  // 새 크기로 배치되는 바로 그 순간에 미리보기를 걷고 위치를 맞춤 → 손을 떼도 화면이 튀지 않음
+  let done=false;
+  const settle=()=>{
+    if(done)return;done=true;
+    z.el.style.transform='';
+    // 기억한 쪽 위치가 손가락 아래로 다시 오게 (쪽 사이 간격은 확대되지 않아 생기던 흔들림 없앰)
+    const el=z.an&&z.an.i>=0&&slots[z.an.i]?slots[z.an.i].el:stage,r=el.getBoundingClientRect();
+    noPickUntil=Date.now()+300;
+    wrap.scrollLeft+=r.left+z.an.u*r.width-anchorX;
+    wrap.scrollTop+=r.top+z.an.v*r.width-anchorY;
+  };
+  afterLayout=settle;
   await renderPage();
-  // 기억한 쪽 위치가 손가락 아래로 다시 오게 (쪽 사이 간격은 확대되지 않아 생기던 흔들림 없앰)
-  const el=z.an&&z.an.i>=0&&slots[z.an.i]?slots[z.an.i].el:stage,r=el.getBoundingClientRect();
-  noPickUntil=Date.now()+300;
-  wrap.scrollLeft+=r.left+z.an.u*r.width-anchorX;
-  wrap.scrollTop+=r.top+z.an.v*r.width-anchorY;
+  if(afterLayout===settle)afterLayout=null;
+  settle();
 }
 const zoomEl=()=>vmode?$('pages'):stage; // 위아래 방식에선 쪽 묶음 전체를 확대
 function zoomTo(newZoom){
@@ -1696,9 +1714,23 @@ function ratioOf(i){
   const f=pmap.find(v=>v);return f?pageRatios[f-1]||1.414:1.414;
 }
 const slotPr=h=>Math.min(window.devicePixelRatio||1,Math.sqrt(8e6/(W*h)));
+let slotsBase='';
 function layoutSlots(){
   const sig=docKey+'|'+pageCount+'|'+Math.round(W)+'|'+(pdf?pmap.join(','):'b')+'|'+bgSig();
   if(sig===slotsSig&&slots.length===pageCount)return false;
+  const base=docKey+'|'+pageCount+'|'+(pdf?pmap.join(','):'b')+'|'+bgSig();
+  if(slots.length===pageCount&&slotsBase===base&&slots.every(sl=>sl.el.isConnected)){
+    // 확대만 바뀜: 쪽을 새로 만들지 않고 크기만 바꿈 → 옛 그림이 잠깐 늘어나 보이다가 또렷하게 다시 그려짐 (하얗게 깜빡이지 않음)
+    slotsSig=sig;
+    slots.forEach((sl,i)=>{
+      const h=W*ratioOf(i);sl.el.style.width=W+'px';sl.el.style.height=h+'px';
+      for(const c of [sl.bg,sl.hl,sl.ink]){c.style.width=W+'px';c.style.height=h+'px';}
+      sl.bgFor=null;
+    });
+    requestAnimationFrame(()=>{for(const i of visSlots){paintSlotBg(i);paintSlotInk(i);}});
+    return false;
+  }
+  slotsBase=base;
   slotsSig=sig;
   stage.remove();
   if(io)io.disconnect();
@@ -1736,14 +1768,17 @@ async function paintSlotBg(i){
   const sl=slots[i],sig=slotsSig;if(!sl||sl.bgFor===sig)return;
   sl.bgFor=sig;
   const h=W*ratioOf(i),pr=slotPr(h),c=sl.bg;
-  c.width=Math.round(W*pr);c.height=Math.round(h*pr);c.style.width=W+'px';c.style.height=h+'px';
-  const g=c.getContext('2d');
   const pn=pdf?pmap[i]||0:0;
-  if(!pn){g.setTransform(pr,0,0,pr,0,0);drawPaper(g,W,h,bgOf(i));return;}
+  c.style.width=W+'px';c.style.height=h+'px';
+  if(!pn){c.width=Math.round(W*pr);c.height=Math.round(h*pr);const g=c.getContext('2d');g.setTransform(pr,0,0,pr,0,0);drawPaper(g,W,h,bgOf(i));return;}
   try{
     const pp=await pdf.getPage(pn);if(slotsSig!==sig)return;
     const v0=pp.getViewport({scale:1});
-    await pp.render({canvasContext:g,viewport:pp.getViewport({scale:(W/v0.width)*pr})}).promise;
+    // 안 보이는 캔버스에 다 그린 뒤 한 번에 옮김 → 그리는 동안 하얗게 비지 않음
+    const o=document.createElement('canvas');o.width=Math.round(W*pr);o.height=Math.round(h*pr);
+    await pp.render({canvasContext:o.getContext('2d'),viewport:pp.getViewport({scale:(W/v0.width)*pr})}).promise;
+    if(slotsSig!==sig||slots[i]!==sl)return;
+    c.width=o.width;c.height=o.height;c.getContext('2d').drawImage(o,0,0);
   }catch(_){if(slots[i]===sl)sl.bgFor=null;}
 }
 function paintSlotInk(i){ // 판이 없는 쪽의 필기를 그림으로 보여 줌
