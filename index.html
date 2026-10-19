@@ -1025,9 +1025,11 @@ function inkDown(e){
   cancelTouches();
   penDown(e);
   if(cur)cur.pid=e.pointerId;
+  if(dbg)dbg(`[앱] 닿음 처리: 도구=${tool} 획=${cur?(cur.erase?'지우개':cur.laser?'레이저':'펜'):'없음'}`);
 }
 // 펜 옆 단추(S펜 버튼 = 오른쪽 단추)나 펜 뒤쪽 지우개를 누르고 있으면 지우개
 const penBtnErase=e=>e.pointerType==='pen'&&(((e.buttons||0)&34)!==0||e.button===2||e.button===5);
+let dbg=null; // #pentest 점검 화면용 기록
 let tempErase=false,penContact=false,ghostOn=false,ghostAt=null,lastToggle=0,toolBeforeErase='pen'; // penContact: 펜이 pointerdown으로 정상적으로 닿아 있는 중
 function showTempErase(on){ // 단추를 누르는 동안만 지우개 단추에 불이 들어옴
   if(on===tempErase)return;tempErase=on;
@@ -1102,6 +1104,7 @@ function endPointer(e){
 }
 function finishStroke(){
   lastPenUp=Date.now();
+  if(dbg&&cur)dbg(`[앱] 획 끝: ${cur.erase?'지우개 '+(cur.changed?'지움':'못 지움'):'펜'} · 필기 ${strokes[page].length}개`);
   if(cur&&cur.btn)setTimeout(()=>{if(!cur)showTempErase(false);},0); // 단추 지우개가 끝나면 원래 도구로
   if(cur&&cur.textDrag){const c=cur;cur=null;textUp(c);return;}
   if(cur&&cur.laser){cur.s.end=performance.now();kickLaser();}
@@ -1111,7 +1114,8 @@ function finishStroke(){
 window.addEventListener('pointerup',endPointer);
 window.addEventListener('pointercancel',endPointer);
 ink.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch'&&!cur){hoverPt=null;kickLaser();if(e.pointerType==='pen')showTempErase(false);}});
-function penBtnToggle(){ // S펜 단추 한 번 = 지우개 켜기 / 끄기
+function penBtnToggle(src){ // S펜 단추 한 번 = 지우개 켜기 / 끄기
+  if(dbg)dbg(`[앱] 단추 신호(${src||'움직임'}) ${Date.now()-lastToggle<500?'→ 무시(방금 바꿈)':'→ 바꿈'}`);
   if(Date.now()-lastToggle<500)return; // 한 번 누를 때 신호가 두 번 와도 한 번만
   lastToggle=Date.now();
   if(tool==='eraser'){setTool(toolBeforeErase||'pen');toast('펜으로 돌아왔어요');}
@@ -1119,7 +1123,7 @@ function penBtnToggle(){ // S펜 단추 한 번 = 지우개 켜기 / 끄기
 }
 wrap.addEventListener('contextmenu',e=>{ // 펜 단추를 오른쪽 클릭(길게 누름)으로 보내는 기기: 메뉴 대신 지우개 켜기/끄기
   e.preventDefault();
-  if(Date.now()-lastPenSeen<1500&&!cur)penBtnToggle();
+  if(Date.now()-lastPenSeen<1500&&!cur&&!ghostOn&&Date.now()-lastToggle>1500)penBtnToggle('길게누름'); // 단추를 누르고 있는 중에 온 길게누름은 같은 누름
 });
 /* 펜 단추 점검: 주소 끝에 #pentest 를 붙이면 펜이 보내는 신호를 화면에 보여 줌 */
 if(location.hash==='#pentest'){
@@ -1127,7 +1131,7 @@ if(location.hash==='#pentest'){
   box.style.cssText='position:fixed;left:8px;top:80px;z-index:9999;max-width:min(560px,94vw);max-height:60vh;overflow:auto;margin:0;padding:10px 12px;background:rgba(15,23,42,.88);color:#E5E7EB;font:12px/1.5 monospace;border-radius:10px;pointer-events:none;white-space:pre-wrap';
   document.body.appendChild(box);
   const lines=[];let last='';
-  const log=t=>{if(t===last)return;last=t;lines.unshift(t);lines.length=Math.min(lines.length,26);box.textContent='펜 단추 점검 (이 화면을 찍어 보내 주세요)\n'+lines.join('\n');};
+  const log=t=>{if(t===last)return;last=t;lines.unshift(t);lines.length=Math.min(lines.length,34);box.textContent='펜 단추 점검 (이 화면을 찍어 보내 주세요)\n'+lines.join('\n');};
   const pe=e=>`${e.type} 종류=${e.pointerType} button=${e.button} buttons=${e.buttons} 압력=${(e.pressure||0).toFixed(2)} 기울기=${e.tiltX||0},${e.tiltY||0}`;
   const tg=e=>{const t=e.target;return t&&t.closest?' 대상='+((t.closest('[id]')||{}).id||t.tagName)+(t.dataset&&t.dataset.c?'['+t.dataset.c+']':''):'';};
   for(const t of ['pointerdown','pointerup','pointercancel','click'])window.addEventListener(t,e=>log((t==='click'?'click':pe(e))+tg(e)+` x=${Math.round(e.clientX)},y=${Math.round(e.clientY)}`),true);
@@ -1135,7 +1139,8 @@ if(location.hash==='#pentest'){
   for(const t of ['contextmenu','auxclick','mousedown','mouseup'])window.addEventListener(t,e=>log(`${t} button=${e.button} buttons=${e.buttons}`),true);
   window.addEventListener('keydown',e=>log(`keydown key=${e.key} code=${e.code} keyCode=${e.keyCode}`),true);
   window.addEventListener('touchstart',e=>log(`touchstart 손가락수=${e.touches.length} 종류=${[...e.changedTouches].map(t=>t.touchType||'-').join(',')} 반지름=${[...e.changedTouches].map(t=>Math.round(t.radiusX||0)).join(',')}`),true);
-  log('준비됨: 펜을 대고 쓰기 → 단추 누른 채 쓰기 → 단추 누른 채 떠 있기');
+  dbg=log;
+  log('준비됨: 단추 눌러 지우개로 → 떼었다가 문지르기 → 한 번 더 문지르기');
 }
 // 아이패드: 화면 끌기·돋보기·길게 눌러 선택이 펜 입력을 끊지 않게
 wrap.addEventListener('touchmove',e=>{if(!e.target.closest('#textEdit'))e.preventDefault();},{passive:false});
