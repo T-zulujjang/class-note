@@ -1063,9 +1063,9 @@ window.addEventListener('pointermove',e=>{
     const be=penBtnErase(e);
     // 갤럭시 크롬: S펜 단추를 누른 채 대면 pointerdown 없이 buttons=1인 움직임만 옴 → 그 움직임을 지우개로
     const ghost=!penContact&&(e.buttons&1)===1;
-    if(ghost&&!cur&&e.pressure>0&&e.target.closest&&e.target.closest('#wrap')){
+    if(ghost&&!cur&&e.target.closest&&e.target.closest('#wrap')){ // 이때 압력은 0으로 오는 기기가 있어 압력은 보지 않음
       cur={erase:true,changed:eraseAt(pos(e)),btn:true,ghost:true,pid:e.pointerId};showTempErase(true);
-    }else if(cur&&cur.ghost&&e.pointerId===cur.pid&&(!(e.buttons&1)||e.pressure===0)){finishStroke();}
+    }else if(cur&&cur.ghost&&e.pointerId===cur.pid&&!(e.buttons&1)){finishStroke();}
     if(!cur)showTempErase(be||ghost); // 떠 있는 채로 단추를 누르면 지우개로 보였다가, 놓으면 원래대로
     else if(be&&!cur.erase&&!cur.laser&&!cur.textDrag&&e.pointerId===cur.pid){ // 쓰는 도중 단추를 누르면 그 자리부터 지우개
       if(cur.pts&&cur.pts.length<2){const L=strokes[page],i=L.indexOf(cur);if(i>=0)L.splice(i,1);redraw();}
