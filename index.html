@@ -1148,8 +1148,12 @@ if(location.hash==='#pentest'){
   const box=document.createElement('pre');
   box.style.cssText='position:fixed;left:8px;top:80px;z-index:9999;max-width:min(560px,94vw);max-height:60vh;overflow:auto;margin:0;padding:10px 12px;background:rgba(15,23,42,.88);color:#E5E7EB;font:12px/1.5 monospace;border-radius:10px;pointer-events:none;white-space:pre-wrap';
   document.body.appendChild(box);
-  const lines=[];let last='';
-  const log=t=>{if(t===last)return;last=t;lines.unshift(t);lines.length=Math.min(lines.length,80);box.textContent='펜 단추 점검 (이 화면을 찍어 보내 주세요)\n'+lines.join('\n');};
+  const lines=[];let last='',rep=1,t0=performance.now(),tl=t0;
+  const show=()=>{box.textContent='펜 단추 점검 (이 화면을 찍어 보내 주세요)\n'+lines.join('\n');};
+  const log=t=>{const now=performance.now();
+    if(t===last){rep++;lines[0]=lines[0].replace(/ ×\d+$/,'')+' ×'+rep;tl=now;show();return;} // 같은 줄이 이어지면 횟수만 늘림
+    const gap=now-tl;tl=now;last=t;rep=1;
+    lines.unshift(`${((now-t0)/1000).toFixed(1)}s${gap>400?' (+'+(gap/1000).toFixed(1)+'초 조용)':''} ${t}`);lines.length=Math.min(lines.length,80);show();};
   const pe=e=>`${e.type} 종류=${e.pointerType} button=${e.button} buttons=${e.buttons} 압력=${(e.pressure||0).toFixed(2)} 기울기=${e.tiltX||0},${e.tiltY||0}`;
   const tg=e=>{const t=e.target;return t&&t.closest?' 대상='+((t.closest('[id]')||{}).id||t.tagName)+(t.dataset&&t.dataset.c?'['+t.dataset.c+']':''):'';};
   for(const t of ['pointerdown','pointerup','pointercancel','click'])window.addEventListener(t,e=>log((t==='click'?'click':pe(e))+tg(e)+` x=${Math.round(e.clientX)},y=${Math.round(e.clientY)}`),true);
@@ -1157,6 +1161,9 @@ if(location.hash==='#pentest'){
   for(const t of ['contextmenu','auxclick','mousedown','mouseup'])window.addEventListener(t,e=>log(`${t} button=${e.button} buttons=${e.buttons}`),true);
   window.addEventListener('keydown',e=>log(`keydown key=${e.key} code=${e.code} keyCode=${e.keyCode}`),true);
   window.addEventListener('touchstart',e=>log(`touchstart 손가락수=${e.touches.length} 종류=${[...e.changedTouches].map(t=>t.touchType||'-').join(',')} 반지름=${[...e.changedTouches].map(t=>Math.round(t.radiusX||0)).join(',')}`),true);
+  for(const t of ['blur','focus'])window.addEventListener(t,()=>log(`창 ${t==='blur'?'포커스 잃음(다른 화면이 앞에 뜸)':'포커스 돌아옴'}`));
+  document.addEventListener('visibilitychange',()=>log('화면 '+document.visibilityState));
+  for(const t of ['touchend','touchcancel','lostpointercapture','dragstart','selectstart'])window.addEventListener(t,e=>log(`${t}`+(e.pointerType?' 종류='+e.pointerType:'')),true);
   dbg=log;
   log('준비됨: 단추 눌러 지우개로 → 떼었다가 문지르기 → 한 번 더 문지르기');
 }
