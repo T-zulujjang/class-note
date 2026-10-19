@@ -1099,7 +1099,28 @@ function finishStroke(){
 window.addEventListener('pointerup',endPointer);
 window.addEventListener('pointercancel',endPointer);
 ink.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch'&&!cur){hoverPt=null;kickLaser();if(e.pointerType==='pen')showTempErase(false);}});
-wrap.addEventListener('contextmenu',e=>e.preventDefault()); // 펜 단추를 오른쪽 클릭으로 보는 기기에서 메뉴가 뜨지 않게
+wrap.addEventListener('contextmenu',e=>{ // 펜 단추를 오른쪽 클릭(길게 누름)으로 보내는 기기: 메뉴 대신 지우개로
+  e.preventDefault();
+  if(cur&&!cur.erase&&!cur.laser&&!cur.textDrag&&Date.now()-lastPenSeen<300){
+    if(cur.pts&&cur.pts.length<3){const L=strokes[page],i=L.indexOf(cur);if(i>=0)L.splice(i,1);redraw();}else markDirty();
+    cur={erase:true,changed:eraseAt(pos(e)),btn:true,pid:cur.pid};showTempErase(true);
+  }
+});
+/* 펜 단추 점검: 주소 끝에 #pentest 를 붙이면 펜이 보내는 신호를 화면에 보여 줌 */
+if(location.hash==='#pentest'){
+  const box=document.createElement('pre');
+  box.style.cssText='position:fixed;left:8px;top:80px;z-index:9999;max-width:min(560px,94vw);max-height:60vh;overflow:auto;margin:0;padding:10px 12px;background:rgba(15,23,42,.88);color:#E5E7EB;font:12px/1.5 monospace;border-radius:10px;pointer-events:none;white-space:pre-wrap';
+  document.body.appendChild(box);
+  const lines=[];let last='';
+  const log=t=>{if(t===last)return;last=t;lines.unshift(t);lines.length=Math.min(lines.length,26);box.textContent='펜 단추 점검 (이 화면을 찍어 보내 주세요)\n'+lines.join('\n');};
+  const pe=e=>`${e.type} 종류=${e.pointerType} button=${e.button} buttons=${e.buttons} 압력=${(e.pressure||0).toFixed(2)} 기울기=${e.tiltX||0},${e.tiltY||0}`;
+  for(const t of ['pointerdown','pointerup','pointercancel'])window.addEventListener(t,e=>log(pe(e)),true);
+  window.addEventListener('pointermove',e=>log(pe(e).replace(/ 압력=.*/,'')),true);
+  for(const t of ['contextmenu','auxclick','mousedown','mouseup'])window.addEventListener(t,e=>log(`${t} button=${e.button} buttons=${e.buttons}`),true);
+  window.addEventListener('keydown',e=>log(`keydown key=${e.key} code=${e.code} keyCode=${e.keyCode}`),true);
+  window.addEventListener('touchstart',e=>log(`touchstart 손가락수=${e.touches.length} 종류=${[...e.changedTouches].map(t=>t.touchType||'-').join(',')} 반지름=${[...e.changedTouches].map(t=>Math.round(t.radiusX||0)).join(',')}`),true);
+  log('준비됨: 펜을 대고 쓰기 → 단추 누른 채 쓰기 → 단추 누른 채 떠 있기');
+}
 // 아이패드: 화면 끌기·돋보기·길게 눌러 선택이 펜 입력을 끊지 않게
 wrap.addEventListener('touchmove',e=>{if(!e.target.closest('#textEdit'))e.preventDefault();},{passive:false});
 // 아이패드: 두 손가락은 사파리 자체 확대 대신 클래스 노트 확대로
