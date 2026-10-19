@@ -1089,6 +1089,12 @@ window.addEventListener('pointermove',e=>{
       if(ghost&&!holdBtn){holdBtn=true;if(dbg)dbg('[앱] 단추 누름 → 지우개');}
       else if(!ghost&&holdBtn&&!(e.buttons&1)){holdBtn=false;if(dbg)dbg('[앱] 단추 뗌 → 원래 도구');}
     }
+    // 갤럭시: 단추를 누른 채 닿으면 '닿음' 신호 없이 buttons=1 움직임만 옴(압력 0) → 그 움직임으로 지움
+    if(holdBtn&&ghost&&!cur&&e.target.closest&&e.target.closest('#wrap')&&!e.target.closest('button,input,select,#textEdit')){
+      cancelTouches();const p0=pos(e);
+      cur={erase:true,changed:eraseAt(p0),btn:true,pid:e.pointerId,lp:p0,ghost:true};showTempErase(true);
+      if(dbg)dbg('[앱] 단추 누른 채 움직임 → 지우기');
+    }else if(cur&&cur.ghost&&e.pointerId===cur.pid&&!ghost){finishStroke();}
     ghostOn=ghost;
     if(!cur)showTempErase(be||holdBtn); // 단추를 누르고 있는 동안 지우개가 되는 기기(와콤 등)
     else if(be&&!cur.erase&&!cur.laser&&!cur.textDrag&&e.pointerId===cur.pid){ // 쓰는 도중 단추를 누르면 그 자리부터 지우개
@@ -1130,7 +1136,7 @@ function finishStroke(){
 }
 window.addEventListener('pointerup',endPointer);
 window.addEventListener('pointercancel',endPointer);
-ink.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch'&&!cur){hoverPt=null;kickLaser();if(e.pointerType==='pen'){holdBtn=false;showTempErase(false);}}});
+ink.addEventListener('pointerleave',e=>{if(cur&&cur.ghost&&e.pointerId===cur.pid)finishStroke();if(e.pointerType!=='touch'&&!cur){hoverPt=null;kickLaser();if(e.pointerType==='pen'){holdBtn=false;showTempErase(false);}}});
 function penBtnToggle(src){ // S펜 단추 한 번 = 지우개 켜기 / 끄기
   if(dbg)dbg(`[앱] 단추 신호(${src||'움직임'}) ${Date.now()-lastToggle<500?'→ 무시(방금 바꿈)':'→ 바꿈'}`);
   if(Date.now()-lastToggle<500)return; // 한 번 누를 때 신호가 두 번 와도 한 번만
