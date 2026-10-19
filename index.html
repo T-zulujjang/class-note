@@ -881,6 +881,9 @@ function eraseAt(p){
   return false;
 }
 // 펜촉 미리보기: 도구·굵기·각도·색이 바뀌면 같이 바뀜
+// 캘리그래피 펜 굵기: 슬라이더 2~30 → 1.5~12 (예전 최고 굵기의 40% 정도까지만, 가는 쪽은 그대로)
+// 획에 굵기가 함께 저장되므로 예전에 쓴 필기 모양은 바뀌지 않음
+const calSize=v=>1.5+(v-2)*0.38;
 function updateNib(){
   const nib=$('nib'),size=+$('size').value;
   const marker=tool==='marker';
@@ -896,7 +899,7 @@ function updateNib(){
     nib.style.background=curColor();nib.style.opacity=1;return;
   }
   nib.style.borderRadius='2px';
-  nib.style.height=Math.min(30,(8+size*0.75)*(marker?1.5:1))+'px';
+  nib.style.height=Math.min(30,marker?(8+size*0.75)*1.5:4+calSize(size)*1.8)+'px';
   nib.style.width=(marker?6:4)+'px';
   nib.style.transform='rotate('+((+$('angle').value)-90)+'deg)';
   nib.style.background=curColor();
@@ -1041,7 +1044,7 @@ function penDown(e){
   }
   if(tool==='eraser'||e.button===5){cur={erase:true,changed:eraseAt(pos(e))};return;} // 펜 뒤쪽 지우개도 인식
   const marker=tool==='marker',size=+$('size').value;
-  cur={color:curColor(),size:marker?size*MARKER_SCALE:size,angle:+$('angle').value,marker,pts:[pos(e)]};
+  cur={color:curColor(),size:marker?size*MARKER_SCALE:penType==='cal'?calSize(size):size,angle:+$('angle').value,marker,pts:[pos(e)]};
   if(!marker&&penType!=='cal')cur.pt=penType; // 볼펜·붓펜
   strokes[page].push(cur);drawStroke(cur);
 }
