@@ -1048,7 +1048,7 @@ function inkDown(e){
 // 펜 옆 단추(S펜 버튼 = 오른쪽 단추)나 펜 뒤쪽 지우개를 누르고 있으면 지우개
 const penBtnErase=e=>e.pointerType==='pen'&&(((e.buttons||0)&34)!==0||e.button===2||e.button===5);
 let dbg=null; // #pentest 점검 화면용 기록
-let tempErase=false,penContact=false,ghostOn=false,ghostAt=null,lastToggle=0,toolBeforeErase='pen'; // penContact: 펜이 pointerdown으로 정상적으로 닿아 있는 중
+let holdBtn=false,tempErase=false,penContact=false,ghostOn=false,ghostAt=null,lastToggle=0,toolBeforeErase='pen'; // penContact: 펜이 pointerdown으로 정상적으로 닿아 있는 중
 function showTempErase(on){ // 단추를 누르는 동안만 지우개 단추에 불이 들어옴
   if(on===tempErase)return;tempErase=on;
   $('eraser').classList.toggle('on',on||tool==='eraser');
@@ -1056,7 +1056,7 @@ function showTempErase(on){ // 단추를 누르는 동안만 지우개 단추에
 }
 function penDown(e){
   if(e.pointerType==='pen')penContact=true;
-  const btnErase=penBtnErase(e);
+  const btnErase=penBtnErase(e)||(e.pointerType==='pen'&&holdBtn);
   if(btnErase){showTempErase(true);if(editing)commitText();}
   if(e.ctrlKey){const l=linkAt(e.clientX,e.clientY);if(l){openLink(l);return;}} // Ctrl+클릭으로 링크 열기
   try{ink.setPointerCapture(e.pointerId);}catch(_){}
@@ -1083,15 +1083,14 @@ window.addEventListener('pointermove',e=>{
     const be=penBtnErase(e);
     // 갤럭시 크롬: S펜 단추를 누르면 pointerdown 없이 buttons=1 신호만 잠깐 옴 (누른 채 끌기는 기기가 가져감)
     // → 단추를 한 번 누를 때마다 지우개 ↔ 원래 도구로 바꿈
-    const ghost=!penContact&&(e.buttons&1)===1;
-    if(ghost&&!ghostOn&&!cur){penBtnToggle();ghostAt={x:e.clientX,y:e.clientY};}
-    else if(ghost&&ghostOn&&!cur&&ghostAt&&Math.hypot(e.clientX-ghostAt.x,e.clientY-ghostAt.y)>8&&e.target.closest&&e.target.closest('#wrap')){
-      // 단추를 누른 뒤 펜을 떼지 않고 바로 이어 쓰면 '닿음' 신호가 안 와서 첫 획이 무시되던 문제 → 그 움직임부터 획으로
-      ghostAt=null;cancelTouches();penDown(e);if(cur){cur.pid=e.pointerId;cur.ghost=true;}
-    }else if(cur&&cur.ghost&&e.pointerId===cur.pid&&!(e.buttons&1)){finishStroke();penContact=false;}
-    if(!ghost)ghostAt=null;
+    // 갤럭시 크롬: S펜 단추를 누르고 있으면 펜이 떠 있어도 buttons=1 신호가 옴 → 누르고 있는 동안만 지우개
+    const ghost=!penContact&&(e.buttons&1)===1&&!(e.pressure>0);
+    if(!penContact){
+      if(ghost&&!holdBtn){holdBtn=true;if(dbg)dbg('[앱] 단추 누름 → 지우개');}
+      else if(!ghost&&holdBtn&&!(e.buttons&1)){holdBtn=false;if(dbg)dbg('[앱] 단추 뗌 → 원래 도구');}
+    }
     ghostOn=ghost;
-    if(!cur)showTempErase(be); // 단추를 누르고 있는 동안 지우개가 되는 기기(와콤 등)
+    if(!cur)showTempErase(be||holdBtn); // 단추를 누르고 있는 동안 지우개가 되는 기기(와콤 등)
     else if(be&&!cur.erase&&!cur.laser&&!cur.textDrag&&e.pointerId===cur.pid){ // 쓰는 도중 단추를 누르면 그 자리부터 지우개
       if(cur.pts&&cur.pts.length<2){const L=strokes[page],i=L.indexOf(cur);if(i>=0)L.splice(i,1);redraw();}
       else markDirty();
@@ -1123,7 +1122,7 @@ function endPointer(e){
 function finishStroke(){
   lastPenUp=Date.now();
   if(dbg&&cur)dbg(`[앱] 획 끝: ${cur.erase?'지우개 '+(cur.changed?'지움':'못 지움'):'펜'} · 필기 ${strokes[page].length}개`);
-  if(cur&&cur.btn)setTimeout(()=>{if(!cur)showTempErase(false);},0); // 단추 지우개가 끝나면 원래 도구로
+  if(cur&&cur.btn)setTimeout(()=>{if(!cur)showTempErase(holdBtn);},0); // 단추 지우개가 끝나면 원래 도구로
   if(cur&&cur.textDrag){const c=cur;cur=null;textUp(c);return;}
   if(cur&&cur.laser){cur.s.end=performance.now();kickLaser();}
   else if(cur&&(!cur.erase||cur.changed))markDirty(); // 한 획 끝날 때마다 자동 저장 예약
@@ -1131,7 +1130,7 @@ function finishStroke(){
 }
 window.addEventListener('pointerup',endPointer);
 window.addEventListener('pointercancel',endPointer);
-ink.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch'&&!cur){hoverPt=null;kickLaser();if(e.pointerType==='pen')showTempErase(false);}});
+ink.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch'&&!cur){hoverPt=null;kickLaser();if(e.pointerType==='pen'){holdBtn=false;showTempErase(false);}}});
 function penBtnToggle(src){ // S펜 단추 한 번 = 지우개 켜기 / 끄기
   if(dbg)dbg(`[앱] 단추 신호(${src||'움직임'}) ${Date.now()-lastToggle<500?'→ 무시(방금 바꿈)':'→ 바꿈'}`);
   if(Date.now()-lastToggle<500)return; // 한 번 누를 때 신호가 두 번 와도 한 번만
@@ -1139,10 +1138,7 @@ function penBtnToggle(src){ // S펜 단추 한 번 = 지우개 켜기 / 끄기
   if(tool==='eraser'){setTool(toolBeforeErase||'pen');toast('펜으로 돌아왔어요');}
   else{toolBeforeErase=tool==='image'||tool==='text'?'pen':tool;setTool('eraser');toast('지우개 · S펜 단추를 한 번 더 누르면 펜으로');}
 }
-wrap.addEventListener('contextmenu',e=>{ // 펜 단추를 오른쪽 클릭(길게 누름)으로 보내는 기기: 메뉴 대신 지우개 켜기/끄기
-  e.preventDefault();
-  if(Date.now()-lastPenSeen<1500&&!cur&&!ghostOn&&Date.now()-lastToggle>1500)penBtnToggle('길게누름'); // 단추를 누르고 있는 중에 온 길게누름은 같은 누름
-});
+wrap.addEventListener('contextmenu',e=>{e.preventDefault();if(dbg)dbg('[앱] 길게누름 신호(무시)');}); // 펜 단추를 오른쪽 클릭으로 보내는 기기: 메뉴가 뜨지 않게
 /* 펜 단추 점검: 주소 끝에 #pentest 를 붙이면 펜이 보내는 신호를 화면에 보여 줌 */
 if(location.hash==='#pentest'){
   const box=document.createElement('pre');
