@@ -22,7 +22,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none!important}
-html,body{height:100%}
+html,body{height:100%;overscroll-behavior:none} /* 안드로이드: 끝에서 끌면 화면 전체가 늘어났다 돌아오는 효과 끄기 */
 body{
   font-family:'Noto Sans KR','Malgun Gothic',sans-serif;color:var(--ink);overflow:hidden;
   background-color:var(--bg);
@@ -130,7 +130,7 @@ button{font-family:inherit}
 .sep{width:1px;height:26px;flex:none;background:var(--sep);margin:0 6px}
 
 /* 색 */
-.swatches{display:flex;align-items:center;gap:8px;padding:0 6px;flex:none}
+.swatches{display:flex;align-items:center;gap:8px;padding:0 6px;flex:none;touch-action:none} /* 펜으로 색을 누를 때 살짝 끌려도 막대·화면이 밀리지 않게 */
 .sw{width:22px;height:22px;flex:none;border:none;border-radius:50%;cursor:pointer;position:relative;
   box-shadow:0 0 0 2px #fff,0 0 0 2px transparent;transition:box-shadow .15s,transform .15s}
 @media (hover:hover) and (pointer:fine){.sw:hover{transform:scale(1.12)}} /* 마우스에서만: 펜이 떠 있을 때 색 칸이 커졌다 작아졌다 흔들리지 않게 */
@@ -411,7 +411,7 @@ body.ck-idle #clockView{cursor:none}
 .brk{display:none}
 @media (max-width:1180px){
   /* 1줄: 도구 · 되돌리기 · 파일 / 2줄: 색 · 펜 설정 */
-  #bar{flex-wrap:wrap;justify-content:center;overflow:visible;row-gap:4px;column-gap:2px;max-width:calc(100vw - 24px);
+  #bar{touch-action:none;flex-wrap:wrap;justify-content:center;overflow:visible;row-gap:4px;column-gap:2px;max-width:calc(100vw - 24px);
     left:12px;right:12px;transform:none;margin:0 auto;width:fit-content} /* 가운데 정렬은 그대로, 너비는 화면만큼 쓸 수 있게 */
   #bar>.sep{display:none}
   #pen,#marker,#laserBtn,#textBtn,#imgBtn,#eraser{order:1}
