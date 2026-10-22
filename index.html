@@ -809,7 +809,7 @@ function renderLinks(){
   }
 }
 async function openLink(l){
-  if(l.url){window.open(l.url,'_blank','noopener');return;}
+  if(l.url){fsLeaveAt=Date.now();window.open(l.url,'_blank','noopener');return;}
   try{
     let d=l.dest;
     if(typeof d==='string')d=await pdf.getDestination(d);
@@ -2160,9 +2160,35 @@ async function toggleFullscreen(){
     }
   }catch(_){toast('전체 화면으로 바꾸지 못했어요');}
 }
-$('fsBtn').onclick=toggleFullscreen;
-document.addEventListener('fullscreenchange',updateFsBtn);
-document.addEventListener('webkitfullscreenchange',updateFsBtn);
+$('fsBtn').onclick=()=>{if(fsRestore&&!fsEl()){fsRestore=false;setFsMode(false);updateFsBtn();return;}fsRestore=false;toggleFullscreen();};
+// 링크를 눌러 다른 창에 갔다 오면 브라우저가 전체 화면을 풀어 버림 → 돌아와서 화면을 처음 누를 때 다시 전체 화면으로
+// (브라우저는 사용자가 누를 때만 전체 화면을 허락해서, 돌아오자마자 저절로는 안 됨)
+let fsRestore=false,fsLeaveAt=0;
+const markLeave=()=>{fsLeaveAt=Date.now();};
+window.addEventListener('blur',markLeave);
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)markLeave();
+  else if(fsRestore){setFsMode(true);toast('화면을 한 번 누르면 다시 전체 화면이 돼요');}
+});
+function fsLeftByLeaving(){return document.hidden||!document.hasFocus()||Date.now()-fsLeaveAt<1500;}
+function onFsChange(){
+  if(fsEl())fsRestore=false;
+  else if(fsMode&&!fsPseudo&&fsLeftByLeaving())fsRestore=true; // 내가 끈 게 아니라 창을 옮겨서 풀림
+  updateFsBtn();
+  if(fsRestore&&!document.hidden)setFsMode(true); // 위쪽 메뉴는 계속 숨김
+}
+function tryFsRestore(){
+  if(!fsRestore||fsEl()||document.hidden)return;
+  const el=document.documentElement;
+  try{
+    const r=el.requestFullscreen?el.requestFullscreen({navigationUI:'hide'}):el.webkitRequestFullscreen?el.webkitRequestFullscreen():null;
+    if(r&&r.catch)r.catch(()=>{});
+  }catch(_){}
+}
+window.addEventListener('pointerup',e=>{if(!(e.target.closest&&e.target.closest('#fsBtn')))tryFsRestore();},true);
+window.addEventListener('keydown',e=>{if(e.key!=='Escape'&&e.key!=='f'&&e.key!=='F')tryFsRestore();},true);
+document.addEventListener('fullscreenchange',onFsChange);
+document.addEventListener('webkitfullscreenchange',onFsChange);
 updateFsBtn();
 
 /* ---------- 쪽 번호로 바로 가기 ---------- */
