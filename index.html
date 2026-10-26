@@ -1533,7 +1533,15 @@ function pollPads(){
     // 십자 버튼: 단추로 오는 패드, 축으로 오는 패드, '모자 축'(9번) 하나로 오는 패드 (위 -1, 오른쪽 -0.43, 아래 0.14, 왼쪽 0.71, 안 누름 1 넘음)
     const ax=g.axes||[],h=ax[9];
     const hat=v=>g.mapping!=='standard'&&typeof h==='number'&&h<=1&&Math.abs(h-v)<0.15;
-    const dirs={12:btn(12)||ax[1]<-0.6||hat(-1),13:btn(13)||ax[1]>0.6||hat(0.142),14:btn(14)||ax[0]<-0.6||hat(0.714),15:btn(15)||ax[0]>0.6||hat(-0.428)};
+    // 한 번에 한 방향만: 패드가 같은 누름을 단추·축 두 가지로 보내거나 살짝 대각선으로 눌려도 굵기·펜촉각이 함께 바뀌지 않게
+    let dirs={12:btn(12),13:btn(13),14:btn(14),15:btn(15)};
+    if(![12,13,14,15].some(i=>dirs[i])){
+      const x=ax[0]||0,y=ax[1]||0;
+      if(Math.max(Math.abs(x),Math.abs(y))>0.6){if(Math.abs(x)>=Math.abs(y))dirs[x<0?14:15]=true;else dirs[y<0?12:13]=true;}
+      else dirs={12:hat(-1),13:hat(0.142),14:hat(0.714),15:hat(-0.428)};
+    }
+    const act=[12,13,14,15].filter(i=>dirs[i]);
+    if(act.length>1){const keep=act.find(i=>prev['d'+i])||act[0];for(const i of act)dirs[i]=i===keep;}
     for(const i of [12,13,14,15]){
       const k='d'+i,on=dirs[i];
       if(on&&!prev[k]){
