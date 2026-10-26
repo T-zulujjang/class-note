@@ -994,7 +994,7 @@ wrap.addEventListener('wheel',e=>{
 
 /* ---------- 페이지 이동 ---------- */
 let toastTimer;
-function toast(msg){const t=$('toast');t.textContent=msg;t.style.opacity=1;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.opacity=0,900);}
+function toast(msg,dot){const t=$('toast');t.textContent=msg;if(dot){const d=document.createElement('span');d.style.cssText=`display:inline-block;width:14px;height:14px;border-radius:50%;margin-right:8px;vertical-align:-2px;background:${dot};box-shadow:0 0 0 2px #fff`;t.prepend(d);}t.style.opacity=1;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.opacity=0,900);}
 async function goPage(n){
   if(n<0||n>=pageCount){toast(n<0?'첫 페이지예요':'마지막 페이지예요');return;}
   commitText();selectImg(null);
@@ -1467,6 +1467,7 @@ document.addEventListener('keydown',e=>{
     case '0':zoomTo(1);break;
     case 'z':case 'u':$('undo').click();break; // 리모컨용: Ctrl 없이 되돌리기
     case 'x':remoteToggleErase();break; // 리모컨용: 지우개 ↔ 펜
+    case 'c':cycleColor(1);break;case 'C':cycleColor(-1);break; // 리모컨용: 다음·앞 색
   }
   if(['p','h','l','e','t','x'].includes(e.key))toast(TOOL_NAME[tool]||tool); // 판을 보면서도 지금 도구를 알 수 있게
 });
@@ -1477,6 +1478,15 @@ const TOOL_NAME={pen:'펜',marker:'형광펜',eraser:'지우개',laser:'레이�
 let remotePrevTool='pen';
 function remoteTool(t){if(document.body.classList.contains('clock-mode')||document.body.classList.contains('cam-mode'))return;if(tool!=='eraser')remotePrevTool=tool;setTool(t);toast(TOOL_NAME[t]||t);}
 function remoteToggleErase(){if(tool==='eraser')setTool(remotePrevTool==='eraser'?'pen':remotePrevTool);else{remotePrevTool=tool;setTool('eraser');}}
+function cycleColor(dir){ // 색 칸 순서대로 다음·앞 색 (리모컨용)
+  if(tool==='image')setTool('pen');
+  const els=[...document.querySelectorAll('#swatches .sw[data-c]')];if(!els.length)return;
+  const c=curColor().toLowerCase();let i=els.findIndex(el=>el.dataset.c.toLowerCase()===c);
+  i=i<0?0:(i+dir+els.length)%els.length;
+  const el=els[i];setColor(el.dataset.c);
+  const nm=(el.title||'').replace(/^최근 고른 색.*/,'최근 고른 색').replace(/ \(.*\)$/,'');
+  toast((TOOL_NAME[tool]||'')+' · '+nm,el.dataset.c);
+}
 const PAD_ACT={
   0:()=>remoteTool('pen'),      // 아래 단추
   1:()=>remoteTool('eraser'),   // 오른쪽 단추
@@ -1485,6 +1495,7 @@ const PAD_ACT={
   4:()=>{$('undo').click();toast('되돌리기');}, // L
   5:()=>{remoteToggleErase();toast(TOOL_NAME[tool]);}, // R: 지우개 ↔ 펜
   6:()=>goPage(page-1),7:()=>goPage(page+1), // L2·R2
+  8:()=>cycleColor(1), // − (선택): 다음 색
   9:()=>{fsRestore=false;toggleFullscreen();}, // + (시작)
   12:()=>zoomTo(zoom*1.25),13:()=>zoomTo(zoom/1.25), // 십자 위·아래
   14:()=>goPage(page-1),15:()=>goPage(page+1)        // 십자 왼쪽·오른쪽
@@ -1515,7 +1526,7 @@ function pollPads(){
   padLoop=requestAnimationFrame(pollPads);
 }
 window.addEventListener('gamepadconnected',e=>{
-  toast('리모컨 연결됨 · 아래 단추 펜, 오른쪽 단추 지우개');
+  toast('리모컨 연결됨 · 아래 단추 펜, 오른쪽 단추 지우개, SELECT 색 바꾸기');
   if(!padLoop)padLoop=requestAnimationFrame(pollPads);
 });
 window.addEventListener('gamepaddisconnected',()=>toast('리모컨 연결 끊김'));
