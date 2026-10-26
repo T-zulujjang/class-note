@@ -1500,14 +1500,15 @@ function pollPads(){
     g.buttons.forEach((b,i)=>{
       const down=b.pressed||b.value>0.5;
       if(down&&!prev[i]){
-        if(dbg)dbg(`게임패드 단추 ${i} (${g.id.slice(0,24)})`);
+        if(dbg)dbg(`게임패드 단추 ${i} (${g.mapping||'비표준'} · ${g.id.slice(0,30)})`);
         if(!padBusy()&&!document.hidden&&PAD_ACT[i]){if(i!==9)commitText();PAD_ACT[i]();}
       }
       prev[i]=down;
     });
     // 십자 버튼을 축으로 보내는 패드도 있음
-    const ax=g.axes||[],ax9=ax[9];
-    const dirs=[[ax[0]<-0.6,14],[ax[0]>0.6,15],[ax[1]<-0.6,12],[ax[1]>0.6,13]];
+    const ax=g.axes||[],h=ax[9]; // 표준 배치가 아닌 패드: 십자 버튼이 '모자 축'(9번) 하나로 옴 (위 -1, 오른쪽 -0.43, 아래 0.14, 왼쪽 0.71, 안 누름 1 넘음)
+    const hat=v=>g.mapping!=='standard'&&typeof h==='number'&&h<=1&&Math.abs(h-v)<0.15;
+    const dirs=[[ax[0]<-0.6||hat(0.714),14],[ax[0]>0.6||hat(-0.428),15],[ax[1]<-0.6||hat(-1),12],[ax[1]>0.6||hat(0.142),13]];
     for(const [on,i] of dirs){const k='a'+i;if(on&&!prev[k]&&!padBusy()&&!document.hidden&&PAD_ACT[i]){if(dbg)dbg(`게임패드 방향 ${i}`);PAD_ACT[i]();}prev[k]=on;}
     padPrev[g.index]=prev;
   }
