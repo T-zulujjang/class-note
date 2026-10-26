@@ -1495,11 +1495,20 @@ const PAD_ACT={
   4:()=>{$('undo').click();toast('되돌리기');}, // L
   5:()=>{remoteToggleErase();toast(TOOL_NAME[tool]);}, // R: 지우개 ↔ 펜
   6:()=>goPage(page-1),7:()=>goPage(page+1), // L2·R2
-  8:()=>cycleColor(1), // − (선택): 다음 색
   9:()=>{fsRestore=false;toggleFullscreen();}, // + (시작)
-  12:()=>zoomTo(zoom*1.25),13:()=>zoomTo(zoom/1.25), // 십자 위·아래
-  14:()=>goPage(page-1),15:()=>goPage(page+1)        // 십자 왼쪽·오른쪽
 };
+// 십자 버튼: 위·아래 = 굵기, 왼쪽·오른쪽 = 펜촉각 (누르고 있으면 계속 바뀜)
+// SELECT를 누른 채 십자: 왼쪽·오른쪽 = 쪽 넘기기, 위·아래 = 앞·다음 색 / SELECT만 눌렀다 떼면 다음 색
+function nudgeSlider(id,d,lab,unit){
+  if(tool==='text'||tool==='image')setTool('pen');
+  const el=$(id),v=clamp(+el.value+d,+el.min,+el.max);
+  if(v===+el.value){toast(`${lab} ${v}${unit} (${d>0?'최대':'최소'})`);return;}
+  el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));
+  toast(`${lab} ${v}${unit}`+(id==='angle'&&!(tool==='pen'&&penType==='cal')?' · 캘리그래피 펜에서 보여요':''));
+}
+const DIR_ACT={12:()=>nudgeSlider('size',1,'굵기',''),13:()=>nudgeSlider('size',-1,'굵기',''),14:()=>nudgeSlider('angle',-5,'펜촉각','°'),15:()=>nudgeSlider('angle',5,'펜촉각','°')};
+const SEL_DIR={12:()=>cycleColor(-1),13:()=>cycleColor(1),14:()=>goPage(page-1),15:()=>goPage(page+1)};
+let selHeld=false,selUsed=false;
 let padLoop=0;const padPrev={};
 function padBusy(){return !$('camPop').hidden||!$('driveDlg').hidden||document.body.classList.contains('clock-mode')||document.body.classList.contains('cam-mode');}
 function pollPads(){
@@ -1508,25 +1517,38 @@ function pollPads(){
   if(!pads.length)return; // 패드가 없으면 멈춤 (다시 연결되면 gamepadconnected로 시작)
   for(const g of pads){
     const prev=padPrev[g.index]||[];
+    const ok=!padBusy()&&!document.hidden,now=performance.now();
+    const btn=i=>{const b=g.buttons[i];return !!b&&(b.pressed||b.value>0.5);};
     g.buttons.forEach((b,i)=>{
-      const down=b.pressed||b.value>0.5;
+      if(i>=12&&i<=15)return; // 십자는 아래에서 따로
+      const down=btn(i);
       if(down&&!prev[i]){
         if(dbg)dbg(`게임패드 단추 ${i} (${g.mapping||'비표준'} · ${g.id.slice(0,30)})`);
-        if(!padBusy()&&!document.hidden&&PAD_ACT[i]){if(i!==9)commitText();PAD_ACT[i]();}
+        if(i===8){selHeld=true;selUsed=false;}
+        else if(ok&&PAD_ACT[i]){if(i!==9)commitText();PAD_ACT[i]();}
       }
+      if(i===8&&!down&&prev[i]){selHeld=false;if(!selUsed&&ok)cycleColor(1);} // SELECT만 눌렀다 떼면 다음 색
       prev[i]=down;
     });
-    // 십자 버튼을 축으로 보내는 패드도 있음
-    const ax=g.axes||[],h=ax[9]; // 표준 배치가 아닌 패드: 십자 버튼이 '모자 축'(9번) 하나로 옴 (위 -1, 오른쪽 -0.43, 아래 0.14, 왼쪽 0.71, 안 누름 1 넘음)
+    // 십자 버튼: 단추로 오는 패드, 축으로 오는 패드, '모자 축'(9번) 하나로 오는 패드 (위 -1, 오른쪽 -0.43, 아래 0.14, 왼쪽 0.71, 안 누름 1 넘음)
+    const ax=g.axes||[],h=ax[9];
     const hat=v=>g.mapping!=='standard'&&typeof h==='number'&&h<=1&&Math.abs(h-v)<0.15;
-    const dirs=[[ax[0]<-0.6||hat(0.714),14],[ax[0]>0.6||hat(-0.428),15],[ax[1]<-0.6||hat(-1),12],[ax[1]>0.6||hat(0.142),13]];
-    for(const [on,i] of dirs){const k='a'+i;if(on&&!prev[k]&&!padBusy()&&!document.hidden&&PAD_ACT[i]){if(dbg)dbg(`게임패드 방향 ${i}`);PAD_ACT[i]();}prev[k]=on;}
+    const dirs={12:btn(12)||ax[1]<-0.6||hat(-1),13:btn(13)||ax[1]>0.6||hat(0.142),14:btn(14)||ax[0]<-0.6||hat(0.714),15:btn(15)||ax[0]>0.6||hat(-0.428)};
+    for(const i of [12,13,14,15]){
+      const k='d'+i,on=dirs[i];
+      if(on&&!prev[k]){
+        if(dbg)dbg(`게임패드 방향 ${i}`);
+        prev['t'+i]=now+380; // 누르고 있으면 0.38초 뒤부터 반복
+        if(ok){commitText();if(selHeld){selUsed=true;SEL_DIR[i]();}else DIR_ACT[i]();}
+      }else if(on&&!selHeld&&ok&&now>=prev['t'+i]){prev['t'+i]=now+70;DIR_ACT[i]();}
+      prev[k]=on;
+    }
     padPrev[g.index]=prev;
   }
   padLoop=requestAnimationFrame(pollPads);
 }
 window.addEventListener('gamepadconnected',e=>{
-  toast('리모컨 연결됨 · 아래 단추 펜, 오른쪽 단추 지우개, SELECT 색 바꾸기');
+  toast('리모컨 연결됨 · 십자: 굵기·펜촉각, SELECT: 색, SELECT+좌우: 쪽 넘기기');
   if(!padLoop)padLoop=requestAnimationFrame(pollPads);
 });
 window.addEventListener('gamepaddisconnected',()=>toast('리모컨 연결 끊김'));
