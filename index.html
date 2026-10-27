@@ -464,6 +464,7 @@ body.drawer-closed #drawerTab svg{transform:rotate(180deg)}
 body:not(.drawer-closed) #navNext{right:226px}
 body.drawer-closed #navNext{right:46px}
 body.clock-mode #drawerTab,body.cam-mode #drawerTab{display:none!important}
+.side{display:none!important} /* 좌우 넘김 단추는 안 씀: 손으로 밀기·키보드·리모컨으로 넘김 */
 @media (max-width:900px){ /* 아래 막대가 없어졌으니 좁은 화면의 탭·계정 단추를 아래쪽 끝으로 */
   body:not(.clock-mode):not(.cam-mode) #tabs{bottom:16px}
   #acct{bottom:16px}#acctMenu{bottom:70px}
