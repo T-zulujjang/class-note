@@ -469,6 +469,13 @@ body.clock-mode #drawerTab,body.cam-mode #drawerTab{display:none!important}
   body:not(.clock-mode):not(.cam-mode) #tabs{bottom:16px}
   #acct{bottom:16px}#acctMenu{bottom:70px}
 }
+/* 판서·카메라·시계 단추도 왼쪽 서랍: 넣으면 손잡이만 왼쪽 끝에 남음 (판서 화면에서만) */
+#tabs{transition:transform .28s cubic-bezier(.2,.8,.2,1),opacity .4s,translate .25s}
+#tabs #tabsTab{width:30px;padding:0;justify-content:center;color:var(--icon)}
+#tabs #tabsTab svg{transition:transform .28s}
+body.tabs-closed:not(.clock-mode):not(.cam-mode) #tabs{transform:translateX(calc(-100% + 26px))}
+body.tabs-closed:not(.clock-mode):not(.cam-mode) #tabs #tabsTab svg{transform:rotate(180deg)}
+body.clock-mode #tabsTab,body.cam-mode #tabsTab{display:none!important}
 </style>
 </head>
 <body>
@@ -590,6 +597,7 @@ body.clock-mode #drawerTab,body.cam-mode #drawerTab{display:none!important}
   <button id="tabDraw" class="on" role="tab" aria-selected="true" title="판서"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>판서</span></button>
   <button id="tabCam" role="tab" aria-selected="false" title="카메라 (실물 화상기)"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></svg><span>카메라</span></button>
   <button id="tabClock" role="tab" aria-selected="false" title="시계·타이머"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg><span>시계</span></button>
+  <button id="tabsTab" type="button" title="판서·카메라·시계 단추 넣기·꺼내기" aria-label="판서·카메라·시계 단추 넣기·꺼내기"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
 </div>
 
 <!-- ================= 카메라 ================= -->
@@ -1612,6 +1620,15 @@ function setDrawer(open,save=true){
 }
 $('drawerTab').onclick=()=>setDrawer(document.body.classList.contains('drawer-closed'));
 {let v=null;try{v=localStorage.getItem('pen:drawer');}catch(_){}setDrawer(v!=='0',false);}
+
+/* 판서·카메라·시계 단추 서랍 */
+function setTabsDrawer(open,save=true){
+  document.body.classList.toggle('tabs-closed',!open);
+  $('tabsTab').setAttribute('aria-expanded',open?'true':'false');
+  if(save)try{localStorage.setItem('pen:tabsDrawer',open?'1':'0');}catch(_){}
+}
+$('tabsTab').onclick=e=>{e.stopPropagation();setTabsDrawer(document.body.classList.contains('tabs-closed'));};
+{let v=null;try{v=localStorage.getItem('pen:tabsDrawer');}catch(_){}setTabsDrawer(v!=='0',false);}
 let resizeTimer;
 window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(renderPage,150);});
 
